@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { BookRecommendationForm } from "./BookRecommendationForm";
+import { RecommendationRecords } from "./RecommendationRecords";
 import { SubmitFeedback } from "./SubmitFeedback";
-import { isStorageAvailable, loadRecommendations, saveRecommendation } from "./storage";
+import {
+  clearRecommendations,
+  isStorageAvailable,
+  loadRecommendations,
+  saveRecommendation,
+} from "./storage";
 import {
   type CandidateBookRecommendation,
   type BookRecommendationErrors,
@@ -90,6 +96,13 @@ export function BookRecommendationSection() {
     }
   }
 
+  function handleClearRecommendations() {
+    clearRecommendations();
+    setRecommendations([]);
+    setSubmitStatus("idle");
+    setSubmitMessage("");
+  }
+
   return (
     <section id="recommend-book" className="scroll-mt-8">
       <div className="mb-6 max-w-[720px]">
@@ -128,9 +141,7 @@ export function BookRecommendationSection() {
           <p className="mb-4 text-sm leading-6 text-[#9CA3AF]">
             记录仅保存在当前浏览器。刷新后仍可查看，换设备、换浏览器或清理浏览器数据后不可恢复。
           </p>
-          <p className="border-l border-[#E5E7EB]/25 pl-4 text-sm leading-6 text-[#D1D5DB]">
-            当前共有 {recommendations.length} 条本地候选推荐记录。
-          </p>
+          <RecommendationRecords recommendations={recommendations} onClear={handleClearRecommendations} />
         </div>
       </div>
     </section>
