@@ -1,6 +1,43 @@
 "use client";
 
+import { useState } from "react";
+import { BookRecommendationForm } from "./BookRecommendationForm";
+import { SubmitFeedback } from "./SubmitFeedback";
+import {
+  type BookRecommendationErrors,
+  type BookRecommendationFormValues,
+  type SubmitStatus,
+} from "./types";
+import { hasRecommendationErrors, validateRecommendationForm } from "./validation";
+
+const INITIAL_FORM_VALUES: BookRecommendationFormValues = {
+  title: "",
+  author: "",
+  domainId: "",
+  rating: "",
+  reason: "",
+};
+
 export function BookRecommendationSection() {
+  const [formValues, setFormValues] = useState<BookRecommendationFormValues>(INITIAL_FORM_VALUES);
+  const [fieldErrors, setFieldErrors] = useState<BookRecommendationErrors>({});
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
+
+  function handleSubmit() {
+    const errors = validateRecommendationForm(formValues);
+    setFieldErrors(errors);
+
+    if (hasRecommendationErrors(errors)) {
+      setSubmitStatus("error");
+      setSubmitMessage("请先修正表单中的问题。");
+      return;
+    }
+
+    setSubmitStatus("success");
+    setSubmitMessage("表单信息已通过校验。下一步会保存为本地候选推荐记录。");
+  }
+
   return (
     <section id="recommend-book" className="scroll-mt-8">
       <div className="mb-6 max-w-[720px]">
@@ -14,9 +51,24 @@ export function BookRecommendationSection() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
         <div className="border border-[#E5E7EB]/20 bg-[#F7F7F8]/[0.03] p-5">
           <h3 className="mb-3 text-[#F7F7F8]">填写候选推荐</h3>
-          <p className="text-sm leading-6 text-[#9CA3AF]">
+          <p className="mb-5 text-sm leading-6 text-[#9CA3AF]">
             需要包含书名、作者、所属领域、推荐指数和推荐理由。推荐理由应说明长期价值或适合阶段。
           </p>
+          <SubmitFeedback status={submitStatus} message={submitMessage} />
+          <BookRecommendationForm
+            values={formValues}
+            errors={fieldErrors}
+            submitStatus={submitStatus}
+            onChange={(values) => {
+              setFormValues(values);
+              setFieldErrors({});
+              if (submitStatus !== "idle") {
+                setSubmitStatus("idle");
+                setSubmitMessage("");
+              }
+            }}
+            onSubmit={handleSubmit}
+          />
         </div>
 
         <div className="border border-[#E5E7EB]/15 p-5">
