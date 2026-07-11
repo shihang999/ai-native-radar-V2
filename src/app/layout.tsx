@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AI-Native 读书雷达",
-  description: "AI 从业者共建的动态读书雷达，通过主题领域、难度层级、推荐指数帮助用户快速发现值得读的 AI 相关内容",
+  description: "AI 学习认知地图，通过知识领域、学习阶段、默认路径和推荐理由帮助用户理解从哪里开始读、下一步读什么。",
 };
 
 export default function RootLayout({

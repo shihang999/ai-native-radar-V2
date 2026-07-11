@@ -6,14 +6,14 @@
   --color-neutral-1: #6B7280;
   --color-neutral-2: #E5E7EB;
   --color-accent: #E63946;
-  --color-domain-ai-engineering: #2563EB;
-  --color-domain-product-methodology: #7C3AED;
-  --color-domain-agent-design: #0891B2;
+  --color-domain-ai-fundamentals: #2563EB;
+  --color-domain-ai-engineering: #0891B2;
+  --color-domain-ai-product-method: #7C3AED;
+  --color-domain-agent-systems: #EC4899;
   --color-domain-org-change: #059669;
   --color-domain-data-intelligence: #D97706;
   --color-domain-business-landing: #DC2626;
   --color-domain-ethics-governance: #4F46E5;
-  --color-domain-frontier-trends: #EC4899;
 
   --font-sans: "Inter", -apple-system, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
@@ -40,4 +40,8 @@ h3 {
   font-size: 18px;
   font-weight: 600;
   line-height: 1.4;
+}
+
+::selection {
+  background-color: rgba(230, 57, 70, 0.24);
 }

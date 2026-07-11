@@ -73,6 +73,8 @@ function simpleHash(str: string): number {
 
 export function Blip({ book, cx, cy, maxRadius }: BlipProps) {
   const { x, y, color, opacity } = computeBlipPosition(book, cx, cy, maxRadius);
+  const domain = getDomainById(book.domainId);
+  const ring = getRingById(book.ringId);
   const r = RADAR_CONFIG.blipRadius;
 
   return (
@@ -83,7 +85,13 @@ export function Blip({ book, cx, cy, maxRadius }: BlipProps) {
       fill={color}
       opacity={opacity}
     >
-      <title>{`${book.title} - ${book.author} (${book.rating}星)`}</title>
+      <title>
+        {`${book.title} - ${book.author}
+领域：${domain?.name ?? "未分类"}
+阶段：${ring?.name ?? "未分层"}
+推荐指数：${book.rating}/5
+推荐理由：${book.reason}`}
+      </title>
     </circle>
   );
 }
