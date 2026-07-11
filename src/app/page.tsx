@@ -1,5 +1,6 @@
 import { RadarChart } from "@/components/radar/RadarChart";
 import { BOOKS } from "@/data/books";
+import { BookRecommendationSection } from "@/features/book-recommendation/BookRecommendationSection";
 import { DOMAINS, LEARNING_PATH, RINGS, getDomainById, getRingById } from "@/lib/constants";
 
 const featuredBookIds = new Set(LEARNING_PATH.flatMap((step) => step.bookIds));
@@ -23,6 +24,12 @@ export default function Home() {
           <p className="max-w-[680px] text-base leading-7 text-[#E5E7EB]">
             这不是普通书单，而是一张 AI 学习认知地图。它把代表性书籍放入知识领域和学习阶段中，帮助你先建立结构，再决定从哪里开始读、下一步补什么。
           </p>
+          <a
+            href="#recommend-book"
+            className="mt-6 inline-flex border border-[#E5E7EB]/30 px-4 py-2 text-sm font-semibold text-[#F7F7F8] transition hover:border-[#E63946] hover:text-[#E63946]"
+          >
+            推荐一本书
+          </a>
         </section>
 
         <section className="grid items-start gap-8 lg:grid-cols-[minmax(0,680px)_minmax(320px,1fr)]">
@@ -170,6 +177,8 @@ export default function Home() {
             })}
           </div>
         </section>
+
+        <BookRecommendationSection />
       </div>
     </main>
   );
