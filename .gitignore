@@ -32,3 +32,4 @@ npm-debug.log*
 
 # Trae
 .trae/
+.vercel
