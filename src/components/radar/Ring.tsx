@@ -18,9 +18,9 @@ export function Ring({ cx, cy, maxRadius }: RingProps) {
             cy={cy}
             r={radius}
             fill="none"
-            stroke="#E5E7EB"
-            strokeWidth={1}
-            opacity={0.4}
+            stroke="#CBD5E1"
+            strokeWidth={1.5}
+            opacity={0.6}
           />
         );
       })}

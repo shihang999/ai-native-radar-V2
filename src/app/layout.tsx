@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Layout } from "@/components/layout/Layout";
 
 export const metadata: Metadata = {
   title: "AI-Native 读书雷达",
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased">
-        {children}
+        <Layout>{children}</Layout>
       </body>
     </html>
   );

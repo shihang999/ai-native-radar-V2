@@ -1,4 +1,4 @@
-/** 书籍数据结构 */
+/** 书籍数据结构（保持兼容，映射到数据库 Resource 类型） */
 export interface Book {
   id: string;
   title: string;
@@ -7,7 +7,11 @@ export interface Book {
   ringId: string;
   rating: 1 | 2 | 3 | 4 | 5;
   reason: string;
+  coverImageUrl?: string | null;
 }
+
+/** 推荐指数类型 */
+export type RecommendationRating = 1 | 2 | 3 | 4 | 5;
 
 /** 领域定义：8 大象限，从 12 点钟方向顺时针排列 */
 export interface Domain {
@@ -156,14 +160,18 @@ export const COLORS = {
 /** 雷达图配置 */
 export const RADAR_CONFIG = {
   /** SVG viewBox 尺寸（正方形） */
-  size: 600,
+  size: 800,
   /** 中心点 */
-  centerX: 300,
-  centerY: 300,
+  centerX: 400,
+  centerY: 400,
   /** 最外圈半径 */
-  maxRadius: 240,
-  /** blip 默认半径 */
-  blipRadius: 6,
+  maxRadius: 360,
+  /** blip 默认半径（点位直径 16px） */
+  blipRadius: 8,
+  /** 外圆环半径（行星环直径 24px） */
+  ringRadius: 12,
+  /** 悬停缩略图半径（直径 48px） */
+  hoverRadius: 24,
 } as const;
 
 /** 根据领域 ID 查找领域定义 */
