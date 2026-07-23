@@ -332,7 +332,20 @@ export interface Database {
       };
     };
     Views: {};
-    Functions: {};
+    Functions: {
+      increment_view_count: {
+        Args: {
+          resource_id: string;
+        };
+        Returns: undefined;
+      };
+      search_resources: {
+        Args: {
+          search_term: string;
+        };
+        Returns: Database['public']['Tables']['resources']['Row'][];
+      };
+    };
     Enums: {};
   };
 }
