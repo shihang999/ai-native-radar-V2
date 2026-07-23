@@ -124,6 +124,25 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
             <p className="text-sm leading-6 text-[#D1D5DB]">{book.reason}</p>
           </div>
 
+          {/* 资料链接 */}
+          <div className="mt-4 border-t border-[#E5E7EB]/10 pt-4">
+            <h3 className="text-sm font-semibold text-[#F7F7F8] mb-2">
+              资料链接
+            </h3>
+            {book.resourceUrl ? (
+              <a
+                href={book.resourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[#5DB2E2] hover:underline break-all"
+              >
+                {book.resourceUrl}
+              </a>
+            ) : (
+              <p className="text-sm leading-6 text-[#9CA3AF]">无</p>
+            )}
+          </div>
+
           {/* 领域描述 */}
           {domain && (
             <div className="mt-4 border-t border-[#E5E7EB]/10 pt-4">

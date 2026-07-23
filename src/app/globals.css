@@ -24,6 +24,12 @@ body {
   font-family: var(--font-sans);
 }
 
+html {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 64px;
+  scroll-behavior: smooth;
+}
+
 h1 {
   font-size: 32px;
   font-weight: 700;

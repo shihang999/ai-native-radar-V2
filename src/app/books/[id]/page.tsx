@@ -184,21 +184,23 @@ export default async function BookDetailPage({ params }: BookDetailPageProps) {
                     <dd className="text-[#10213E]">{resource.isbn}</dd>
                   </div>
                 )}
-                {resource.resource_url && (
-                  <div className="flex gap-4">
-                    <dt className="w-20 shrink-0 text-[#64748B]">资料链接</dt>
-                    <dd>
+                <div className="flex gap-4">
+                  <dt className="w-20 shrink-0 text-[#64748B]">资料链接</dt>
+                  <dd className="min-w-0 text-[#10213E]">
+                    {resource.resource_url ? (
                       <a
                         href={resource.resource_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#5DB2E2] hover:underline"
+                        className="text-[#5DB2E2] hover:underline break-all"
                       >
-                        查看详情
+                        {resource.resource_url}
                       </a>
-                    </dd>
-                  </div>
-                )}
+                    ) : (
+                      <span className="text-[#94A3B8]">无</span>
+                    )}
+                  </dd>
+                </div>
               </dl>
             </div>
 

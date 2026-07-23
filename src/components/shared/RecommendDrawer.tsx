@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { DOMAINS, type RecommendationRating } from "@/lib/constants";
+import type { Database } from "@/lib/database.types";
 import { showToast } from "./Toast";
 
 interface FormData {
@@ -27,6 +28,14 @@ interface FormErrors {
   reason?: string;
   invite_code?: string;
 }
+
+interface ExistingResourcePreview {
+  id: string;
+  title: string;
+}
+
+type UserRecommendationInsert =
+  Database["public"]["Tables"]["user_recommendations"]["Insert"];
 
 /**
  * 推荐抽屉组件
@@ -141,9 +150,10 @@ export function RecommendDrawer() {
       // 2. 检查重复推荐
       const { data: existingResources } = await supabase
         .from("resources")
-        .select("id, title")
+        .select("id,title")
         .eq("title", formData.title)
-        .limit(1);
+        .limit(1)
+        .returns<ExistingResourcePreview[]>();
 
       if (existingResources && existingResources.length > 0) {
         alert(`该资料已被推荐：${existingResources[0].title}`);
@@ -152,7 +162,7 @@ export function RecommendDrawer() {
       }
 
       // 3. 提交推荐
-      const { error } = await supabase.from("user_recommendations").insert({
+      const payload: UserRecommendationInsert = {
         title: formData.title.trim(),
         resource_type: formData.resource_type,
         resource_url: formData.resource_url.trim() || null,
@@ -162,7 +172,9 @@ export function RecommendDrawer() {
         reason: formData.reason.trim(),
         recommender: formData.recommender.trim() || null,
         status: "pending",
-      });
+      };
+
+      const { error } = await supabase.from("user_recommendations").insert([payload]);
 
       if (error) throw error;
 

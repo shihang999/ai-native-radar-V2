@@ -31,6 +31,7 @@ export interface Database {
           sort_order?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       rings: {
         Row: {
@@ -54,6 +55,7 @@ export interface Database {
           sort_order?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       resources: {
         Row: {
@@ -131,6 +133,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       user_recommendations: {
         Row: {
@@ -193,6 +196,7 @@ export interface Database {
           approved_resource_id?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       ratings: {
         Row: {
@@ -219,6 +223,7 @@ export interface Database {
           session_id?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       resource_stats: {
         Row: {
@@ -245,6 +250,7 @@ export interface Database {
           view_count_30d?: number;
           last_updated_at?: string;
         };
+        Relationships: [];
       };
       comments: {
         Row: {
@@ -274,6 +280,7 @@ export interface Database {
           status?: 'visible' | 'hidden';
           created_at?: string;
         };
+        Relationships: [];
       };
       reading_notes: {
         Row: {
@@ -306,6 +313,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       invite_codes: {
         Row: {
@@ -320,6 +328,7 @@ export interface Database {
           code?: string;
           is_active?: boolean;
         };
+        Relationships: [];
       };
     };
     Views: {};

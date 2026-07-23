@@ -8,6 +8,7 @@ export interface Book {
   rating: 1 | 2 | 3 | 4 | 5;
   reason: string;
   coverImageUrl?: string | null;
+  resourceUrl?: string | null;
 }
 
 /** 推荐指数类型 */

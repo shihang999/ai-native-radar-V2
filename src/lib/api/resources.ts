@@ -1,5 +1,8 @@
 import { supabase } from '../supabase';
-import type { Resource, UserRecommendation } from '../database.types';
+import type { Database, Resource, UserRecommendation } from '../database.types';
+
+type UserRecommendationInsert = Database['public']['Tables']['user_recommendations']['Insert'];
+type RatingInsert = Database['public']['Tables']['ratings']['Insert'];
 
 // 获取所有已审核资源
 export async function getResources(): Promise<Resource[]> {
@@ -123,12 +126,14 @@ export async function submitRecommendation(
     };
   }
 
+  const payload: UserRecommendationInsert = {
+    ...recommendation,
+    status: 'pending'
+  };
+
   const { error } = await supabase
     .from('user_recommendations')
-    .insert({
-      ...recommendation,
-      status: 'pending'
-    });
+    .insert([payload]);
 
   if (error) {
     return {
@@ -147,14 +152,16 @@ export async function submitRating(
   sessionId: string,
   reviewText?: string
 ): Promise<{ success: boolean; error?: string }> {
+  const payload: RatingInsert = {
+    resource_id: resourceId,
+    rating,
+    session_id: sessionId,
+    review_text: reviewText
+  };
+
   const { error } = await supabase
     .from('ratings')
-    .insert({
-      resource_id: resourceId,
-      rating,
-      session_id: sessionId,
-      review_text: reviewText
-    });
+    .insert([payload]);
 
   if (error) {
     return {
