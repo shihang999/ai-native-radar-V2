@@ -106,14 +106,31 @@ BEGIN
 END $$;
 
 -- 9) 合并到已上架资源：审核端操作时写 linked_resource_id
+--    注意：resources.id 在老库中可能是 UUID，这里统一用 TEXT 以兼容；
+--    若类型不兼容则退化为"仅加列不加 FK"，后续审核端仍然能按文本 JOIN。
 DO $$
+DECLARE
+  _id_type TEXT;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'user_recommendations' AND column_name = 'linked_resource_id'
   ) THEN
-    ALTER TABLE user_recommendations ADD COLUMN linked_resource_id TEXT
-      REFERENCES resources(id) ON DELETE SET NULL;
+    SELECT data_type INTO _id_type
+    FROM information_schema.columns
+    WHERE table_name = 'resources' AND column_name = 'id';
+
+    IF _id_type = 'uuid' THEN
+      EXECUTE 'ALTER TABLE user_recommendations ADD COLUMN linked_resource_id UUID
+        REFERENCES resources(id) ON DELETE SET NULL';
+    ELSE
+      BEGIN
+        EXECUTE 'ALTER TABLE user_recommendations ADD COLUMN linked_resource_id TEXT
+          REFERENCES resources(id) ON DELETE SET NULL';
+      EXCEPTION WHEN OTHERS THEN
+        ALTER TABLE user_recommendations ADD COLUMN linked_resource_id TEXT;
+      END;
+    END IF;
   END IF;
 END $$;
 
