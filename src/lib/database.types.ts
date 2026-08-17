@@ -154,6 +154,24 @@ export interface Database {
           reviewed_at: string | null;
           review_note: string | null;
           approved_resource_id: string | null;
+          input_mode: 'text' | 'image' | 'voice' | 'manual' | null;
+          source: 'ai_parsed' | 'manual' | null;
+          batch_id: string | null;
+          raw_text_snapshot: string | null;
+          ocr_text_snapshot: string | null;
+          audio_metadata: Json | null;
+          recommender_name_submitted: string | null;
+          ai_field_confidence: Json | null;
+          linked_resource_id: string | null;
+          reject_reason_category:
+            | 'not_a_recommendation'
+            | 'ai_domain_mismatch'
+            | 'ocr_failed_multiple_books'
+            | 'spam_or_duplicate'
+            | 'incomplete_required_fields'
+            | 'other'
+            | null;
+          reject_reason_detail: string | null;
           created_at: string;
         };
         Insert: {
@@ -174,6 +192,24 @@ export interface Database {
           reviewed_at?: string | null;
           review_note?: string | null;
           approved_resource_id?: string | null;
+          input_mode?: 'text' | 'image' | 'voice' | 'manual' | null;
+          source?: 'ai_parsed' | 'manual' | null;
+          batch_id?: string | null;
+          raw_text_snapshot?: string | null;
+          ocr_text_snapshot?: string | null;
+          audio_metadata?: Json | null;
+          recommender_name_submitted?: string | null;
+          ai_field_confidence?: Json | null;
+          linked_resource_id?: string | null;
+          reject_reason_category?:
+            | 'not_a_recommendation'
+            | 'ai_domain_mismatch'
+            | 'ocr_failed_multiple_books'
+            | 'spam_or_duplicate'
+            | 'incomplete_required_fields'
+            | 'other'
+            | null;
+          reject_reason_detail?: string | null;
           created_at?: string;
         };
         Update: {
@@ -194,6 +230,24 @@ export interface Database {
           reviewed_at?: string | null;
           review_note?: string | null;
           approved_resource_id?: string | null;
+          input_mode?: 'text' | 'image' | 'voice' | 'manual' | null;
+          source?: 'ai_parsed' | 'manual' | null;
+          batch_id?: string | null;
+          raw_text_snapshot?: string | null;
+          ocr_text_snapshot?: string | null;
+          audio_metadata?: Json | null;
+          recommender_name_submitted?: string | null;
+          ai_field_confidence?: Json | null;
+          linked_resource_id?: string | null;
+          reject_reason_category?:
+            | 'not_a_recommendation'
+            | 'ai_domain_mismatch'
+            | 'ocr_failed_multiple_books'
+            | 'spam_or_duplicate'
+            | 'incomplete_required_fields'
+            | 'other'
+            | null;
+          reject_reason_detail?: string | null;
           created_at?: string;
         };
         Relationships: [];
