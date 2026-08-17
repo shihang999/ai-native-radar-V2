@@ -16,6 +16,10 @@ interface BlipProps {
   domainNumber: number;
   groupIndex: number;
   groupCount: number;
+  /** 是否为系统自动 Spotlight（会触发放大+封面+高亮） */
+  isAutoSpotlight?: boolean;
+  /** 是否为用户真实 hover 或系统自动 Spotlight 的「当前展示点」 */
+  isActive?: boolean;
   highlightState?:
     | "self"
     | "same-domain"
@@ -124,7 +128,7 @@ function computeBlipPosition(
 
 function simpleHash(str: string): number {
   let hash = 0;
-  for (let i = 0; i < str.length; i++) {
+  for (let i = 0; i < str.length; i += 1) {
     const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
     hash = hash & hash;
@@ -134,11 +138,10 @@ function simpleHash(str: string): number {
 
 /**
  * 雷达点位组件
- * 实现 MVP 0.4.0 设计规范：
- * - 大点位（16px）+ 外圆环（24px）
- * - 领域内数字ID显示
- * - 悬停缩略图效果（48px）
- * - 分层高亮效果
+ * 支持系统 autoSpotlight：
+ *  - 复用鼠标 hover 完全相同的放大/封面/Popup 逻辑
+ *  - isAutoSpotlight 与 isHovered 在 Blip 内部合并为同一个 active 状态，保证视觉一致
+ *  - 放大半径限制在 hoverRadius（直径 48px）内，不遮挡过多邻点
  */
 export function Blip({
   book,
@@ -148,6 +151,8 @@ export function Blip({
   domainNumber,
   groupIndex,
   groupCount,
+  isAutoSpotlight = false,
+  isActive: externalActive,
   highlightState = "none",
   onHover,
   onClick,
@@ -156,12 +161,13 @@ export function Blip({
 
   const baseRadius = getRatingBaseRadius(book.rating);
   const baseRingRadius = baseRadius + 5;
-  const hoverRadiusCap = Math.min(32, Math.max(RADAR_CONFIG.hoverRadius, baseRadius + 14));
+  // spotlight 放大和 hover 相同，保持视觉一致；但半径限制在 32px 上限，避免密集点位互相遮挡
+  const hoverRadiusCap = Math.min(28, Math.max(RADAR_CONFIG.hoverRadius, baseRadius + 10));
   const paddingPx = baseRingRadius + 2;
 
   const { x, y } = useMemo(
     () => computeBlipPosition(book, cx, cy, maxRadius, groupIndex, groupCount, paddingPx),
-    [book, cx, cy, maxRadius, groupIndex, groupCount, paddingPx]
+    [book, cx, cy, maxRadius, groupIndex, groupCount, paddingPx],
   );
 
   const domain = getDomainById(book.domainId);
@@ -200,14 +206,24 @@ export function Blip({
   const opacity = getOpacity();
   const scale = getScale();
   const isHighlighted = highlightState === "self";
-  const currentRadius = isHovered ? hoverRadiusCap : baseRadius * scale;
+  const activeness = isHovered || isAutoSpotlight || externalActive;
+  const currentRadius = activeness ? hoverRadiusCap : baseRadius * scale;
   const currentRingRadius = baseRingRadius * scale;
   const numberFontSize = Math.min(14, Math.max(10, Math.round(baseRadius + 1)));
 
+  // Spotlight 进入放大动画时长：250ms（处于 200~400ms 区间）
+  const transitionMs = 250;
+  const easing = "cubic-bezier(0.22, 1, 0.36, 1)";
+
   return (
-    <g style={{ opacity, transition: "opacity 0.3s ease" }}>
-      {/* 外圆环（行星环效果） - 非悬停状态显示 */}
-      {!isHovered && (
+    <g
+      style={{
+        opacity,
+        transition: `opacity ${transitionMs}ms ${easing}`,
+      }}
+    >
+      {/* 外圆环（行星环效果） - 非 active 状态显示 */}
+      {!activeness && (
         <circle
           cx={x}
           cy={y}
@@ -217,30 +233,47 @@ export function Blip({
           strokeWidth={1.5}
           opacity={0.3}
           style={{
-            transition: "r 0.3s ease, opacity 0.3s ease",
+            transition: `r ${transitionMs}ms ${easing}, opacity ${transitionMs}ms ${easing}`,
           }}
         />
       )}
 
-      {/* 主圆点 - 悬停时放大为缩略图容器 */}
+      {/* Spotlight 外环高亮脉冲 */}
+      {isAutoSpotlight && !isHovered && (
+        <circle
+          cx={x}
+          cy={y}
+          r={currentRadius + 6}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          opacity={0.75}
+          style={{
+            pointerEvents: "none",
+            transition: `r ${transitionMs}ms ${easing}, opacity ${transitionMs}ms ${easing}`,
+          }}
+        />
+      )}
+
+      {/* 主圆点 - active 时放大为缩略图容器 */}
       <circle
         cx={x}
         cy={y}
         r={currentRadius}
-        fill={isHovered && book.coverImageUrl ? "transparent" : color}
-        stroke={isHighlighted ? "#FFFFFF" : isHovered ? "#FFFFFF" : "none"}
-        strokeWidth={isHighlighted ? 2.5 : 2}
+        fill={activeness && book.coverImageUrl ? "transparent" : color}
+        stroke={isHighlighted || activeness ? "#FFFFFF" : "none"}
+        strokeWidth={isHighlighted ? 2.5 : activeness ? 2 : 0}
         style={{
           cursor: "pointer",
-          transition: "r 0.3s ease, stroke 0.3s ease, fill 0.3s ease",
+          transition: `r ${transitionMs}ms ${easing}, stroke ${transitionMs}ms ${easing}, fill ${transitionMs}ms ${easing}`,
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       />
 
-      {/* 悬停时显示封面图或领域色背景 */}
-      {isHovered && (
+      {/* active 时显示封面图或领域色背景（Spotlight 和 Hover 完全一致） */}
+      {activeness && (
         <>
           {book.coverImageUrl ? (
             <image
@@ -253,6 +286,7 @@ export function Blip({
               clipPath={`circle(${hoverRadiusCap}px at ${x} ${y})`}
               style={{
                 pointerEvents: "none",
+                transition: `opacity ${transitionMs}ms ${easing}`,
               }}
             />
           ) : (
@@ -264,14 +298,15 @@ export function Blip({
               opacity={0.8}
               style={{
                 pointerEvents: "none",
+                transition: `opacity ${transitionMs}ms ${easing}`,
               }}
             />
           )}
         </>
       )}
 
-      {/* 数字ID - 非悬停状态显示 */}
-      {!isHovered && (
+      {/* 数字ID - 非 active 状态显示 */}
+      {!activeness && (
         <text
           x={x}
           y={y}
@@ -282,25 +317,26 @@ export function Blip({
           fontWeight="600"
           style={{
             pointerEvents: "none",
-            transition: "opacity 0.3s ease",
+            transition: `opacity ${transitionMs}ms ${easing}`,
           }}
         >
           {domainNumber}
         </text>
       )}
 
-      {/* 悬停时显示大数字（无封面图时） */}
-      {isHovered && !book.coverImageUrl && (
+      {/* active 时显示大数字（无封面图时） - Spotlight 和 Hover 完全一致 */}
+      {activeness && !book.coverImageUrl && (
         <text
           x={x}
           y={y}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={22}
+          fontSize={20}
           fill="#FFFFFF"
           fontWeight="600"
           style={{
             pointerEvents: "none",
+            transition: `opacity ${transitionMs}ms ${easing}`,
           }}
         >
           {domainNumber}

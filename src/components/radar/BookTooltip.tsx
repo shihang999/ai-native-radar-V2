@@ -2,43 +2,60 @@ import { type Book, getDomainById, getRingById } from "@/lib/constants";
 
 interface BookTooltipProps {
   book: Book;
+  /** 基准点的屏幕/页面坐标（clientX / clientY），可以是鼠标位置或 SVG 点位映射后的坐标 */
   mouseX: number;
   mouseY: number;
+  /** 是否来自系统自动 Spotlight（true 时附加一个轻微 "自动播放中" 视觉标识） */
+  autoSpotlight?: boolean;
 }
 
 /**
  * 雷达点位 Tooltip 组件
- * 遵循 MVP 0.3.0 设计规范：白色背景、投影、推荐理由摘要
+ *  - 自动 spotlight 与用户 hover 完全复用同一个组件
+ *  - 根据基准点自动判断 Tooltip 显示方向，避免超出视口边界
  */
-export function BookTooltip({ book, mouseX, mouseY }: BookTooltipProps) {
+export function BookTooltip({ book, mouseX, mouseY, autoSpotlight = false }: BookTooltipProps) {
   const domain = getDomainById(book.domainId);
   const ring = getRingById(book.ringId);
 
-  // 计算 tooltip 位置，避免超出视口
   const offsetX = 16;
   const offsetY = 16;
   const tooltipWidth = 280;
+  const estimatedHeight = 210;
 
   let left = mouseX + offsetX;
   let top = mouseY + offsetY;
 
-  // 如果右侧空间不足，显示在左侧
-  if (left + tooltipWidth > window.innerWidth - 16) {
+  const pad = 16;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+
+  const rightOverflow = left + tooltipWidth + pad - vw;
+  if (rightOverflow > 0) {
+    // 翻转到左侧：基准点左边再往左偏移 tooltip 宽度
     left = mouseX - tooltipWidth - offsetX;
   }
-
-  // 如果底部空间不足，显示在上方
-  if (top + 200 > window.innerHeight - 16) {
-    top = mouseY - 200 - offsetY;
+  const leftOverflow = pad - left;
+  if (leftOverflow > 0) {
+    left = pad;
   }
 
-  // 截断推荐理由至 50 字
+  const bottomOverflow = top + estimatedHeight + pad - vh;
+  if (bottomOverflow > 0) {
+    // 翻转到上方：基准点上方
+    top = mouseY - estimatedHeight - offsetY;
+  }
+  const topOverflow = pad - top;
+  if (topOverflow > 0) {
+    top = pad;
+  }
+
   const truncatedReason =
     book.reason.length > 50 ? book.reason.substring(0, 50) + "..." : book.reason;
 
   return (
     <div
-      className="fixed z-50 pointer-events-none animate-in fade-in-0 zoom-in-95 duration-200"
+      className={`fixed z-50 pointer-events-none ${autoSpotlight ? "animate-in fade-in zoom-in-95 duration-300" : "animate-in fade-in-0 zoom-in-95 duration-200"}`}
       style={{
         left: `${left}px`,
         top: `${top}px`,
@@ -46,15 +63,20 @@ export function BookTooltip({ book, mouseX, mouseY }: BookTooltipProps) {
       }}
     >
       <div className="rounded-lg border border-[#E2E8F0] bg-white p-4 shadow-lg">
-        {/* 书名 */}
-        <h4 className="mb-1 text-sm font-semibold text-[#10213E]">
-          {book.title}
-        </h4>
+        <div className="mb-2 flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-[#10213E]">
+            {book.title}
+          </h4>
+          {autoSpotlight && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-medium text-[#2563EB]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#2563EB]" />
+              自动发现
+            </span>
+          )}
+        </div>
 
-        {/* 作者 */}
         <p className="mb-3 text-xs text-[#64748B]">{book.author}</p>
 
-        {/* 元信息标签 */}
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
           {domain && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F5F5F6] px-2 py-1">
@@ -72,7 +94,6 @@ export function BookTooltip({ book, mouseX, mouseY }: BookTooltipProps) {
           )}
         </div>
 
-        {/* 推荐指数 */}
         <div className="mb-3 flex items-center gap-2 text-xs">
           <span className="text-[#64748B]">推荐指数</span>
           <div className="flex items-center gap-0.5">
@@ -93,7 +114,6 @@ export function BookTooltip({ book, mouseX, mouseY }: BookTooltipProps) {
           </div>
         </div>
 
-        {/* 推荐理由摘要 */}
         {book.reason && (
           <div className="border-t border-[#E2E8F0] pt-3">
             <p className="text-xs leading-relaxed text-[#64748B]">
@@ -102,9 +122,8 @@ export function BookTooltip({ book, mouseX, mouseY }: BookTooltipProps) {
           </div>
         )}
 
-        {/* 点击提示 */}
         <p className="mt-3 text-center text-[10px] text-[#9CA3AF]">
-          点击查看详情
+          {autoSpotlight ? "移动鼠标即可手动探索更多" : "点击查看详情"}
         </p>
       </div>
     </div>
