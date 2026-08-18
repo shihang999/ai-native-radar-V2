@@ -338,6 +338,7 @@ export interface ResourceFilters {
   domainId?: string;
   ringId?: string;
   resourceType?: 'book' | 'course' | 'article';
+  searchTerm?: string;
 }
 
 export async function getResourcesWithFilters(filters: ResourceFilters): Promise<Resource[]> {
@@ -357,6 +358,21 @@ export async function getResourcesWithFilters(filters: ResourceFilters): Promise
 
   if (filters.resourceType) {
     query = query.eq('resource_type', filters.resourceType);
+  }
+
+  if (filters.searchTerm) {
+    // 转义 PostgREST or() 语法中的特殊字符，避免查询解析错误
+    const term = filters.searchTerm
+      .trim()
+      .replace(/[%,()]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(' ');
+    if (term) {
+      query = query.or(
+        `title.ilike.%${term}%,author.ilike.%${term}%,reason.ilike.%${term}%`,
+      );
+    }
   }
 
   const { data, error } = await query;
