@@ -356,7 +356,9 @@ export function RecommendDrawer() {
     }
     setFriendlyError(null);
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      const mr = new MediaRecorder(stream);
+      const preferredMimeTypes = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"];
+      const mimeType = preferredMimeTypes.find((item) => MediaRecorder.isTypeSupported(item));
+      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       audioRecordingRef.current = mr;
       audioChunksRef.current = [];
       setRecordingElapsed(0);
@@ -364,7 +366,7 @@ export function RecommendDrawer() {
         if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
       mr.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || mimeType || "audio/webm" });
         setAudioBlob(blob);
         setAudioDurationSec(Math.max(1, recordingElapsed));
         stream.getTracks().forEach((t) => t.stop());
@@ -1034,6 +1036,11 @@ function PreviewCard(props: {
           删除这本
         </button>
       </div>
+      {it.is_new_blank && (
+        <div className="mb-4 rounded-lg border border-dashed border-[#5DB2E2]/50 bg-[#5DB2E2]/5 px-3 py-2 text-[13px] leading-5 font-medium text-[#0369A1]">
+          AI 未能自动拆出内容，请你直接在下面手工填写推荐书籍信息即可。
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4">
         <FieldWithWarn label="标题" required warn={low(it.confidence?.title)}>
           <input

@@ -50,6 +50,7 @@ interface CoerceResult {
     data_base64?: string;
     url?: string;
     localBuffer?: Promise<ArrayBuffer>;
+    _rawBuffer?: ArrayBuffer | Promise<ArrayBuffer>;
   };
 }
 
@@ -75,15 +76,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<ParseRecommen
   let input_mode: InputMode = 'text';
   try {
     const contentType = req.headers.get('content-type') ?? '';
+    const isMultipart = contentType.includes('multipart/form-data');
     let body: unknown;
-    if (contentType.includes('multipart/form-data')) {
+    if (isMultipart) {
       const form = await req.formData();
       body = await parseFormData(form);
     } else {
       body = await req.json().catch(() => ({}));
     }
 
-    const coerced = coerceInput(body);
+    const coerced: CoerceResult = isMultipart ? (body as CoerceResult) : coerceInput(body);
     const mode: InputMode = validateInputMode(coerced.mode);
     input_mode = mode;
     const result = await routeByMode(mode, coerced);
@@ -145,8 +147,11 @@ async function parseFormData(form: FormData): Promise<CoerceResult> {
       else if (raw.includes('jpeg') || raw.includes('jpg')) mime = 'image/jpeg';
       else if (raw.includes('webp')) mime = 'image/webp';
     }
-    if (mime && f instanceof File) {
-      const bytes = Buffer.from(await f.arrayBuffer());
+    const imgIsFileLike =
+      (f as unknown as Record<string, unknown>) &&
+      typeof (f as unknown as Record<string, unknown>).arrayBuffer === 'function';
+    if (mime && (f instanceof File || imgIsFileLike)) {
+      const bytes = Buffer.from(await (f as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer());
       images.push({ mime, data_base64: bytes.toString('base64') });
     } else if (mime) {
       images.push({ mime, url: String(f) });
@@ -160,12 +165,20 @@ async function parseFormData(form: FormData): Promise<CoerceResult> {
   let mime: AudioMime | undefined = toAudioMime(audioMimeRaw);
   let audio: CoerceResult['audio'] | undefined;
 
-  if (audioFile instanceof File) {
-    if (!mime) mime = toAudioMime(audioFile.type.toLowerCase());
+  const isFileLike = (v: unknown): v is File =>
+    typeof v === 'object' &&
+    v !== null &&
+    'arrayBuffer' in (v as Record<string, unknown>) &&
+    typeof (v as Record<string, unknown>).arrayBuffer === 'function';
+
+  if (isFileLike(audioFile)) {
+    if (!mime) mime = toAudioMime(String((audioFile as { type?: string }).type ?? '').toLowerCase());
+    const buffered = audioFile.arrayBuffer();
     audio = {
       mime,
       duration_seconds: duration,
-      localBuffer: audioFile.arrayBuffer(),
+      localBuffer: buffered,
+      _rawBuffer: buffered,
     };
   } else if (audioUrl) {
     audio = { mime, duration_seconds: duration, url: audioUrl };
@@ -212,6 +225,12 @@ function coerceInput(body: unknown): CoerceResult {
     };
   }
   return { mode, text, images, audio };
+}
+
+function materializeAudioBuffer(audio: NonNullable<CoerceResult['audio']>): Promise<ArrayBuffer> | ArrayBuffer | undefined {
+  if (audio._rawBuffer) return audio._rawBuffer;
+  if (audio.localBuffer) return audio.localBuffer;
+  return undefined;
 }
 
 interface RoutedResult {
@@ -328,7 +347,10 @@ async function routeByMode(mode: InputMode, data: CoerceResult): Promise<RoutedR
   const audio = data.audio;
   const hasPayload =
     !!audio &&
-    ((!!audio.data_base64 && audio.data_base64.length > 0) || !!audio.url || !!audio.localBuffer);
+    ((!!audio.data_base64 && audio.data_base64.length > 0) ||
+      !!audio.url ||
+      !!audio.localBuffer ||
+      !!audio._rawBuffer);
   if (!audio || !hasPayload) {
     return {
       status: 'empty',
@@ -351,8 +373,9 @@ async function routeByMode(mode: InputMode, data: CoerceResult): Promise<RoutedR
   let buffer: ArrayBuffer;
   const mime: AudioMime = audio.mime ?? 'audio/mpeg';
   let detectedLanguage: string | undefined;
-  if (audio.localBuffer) {
-    buffer = await audio.localBuffer;
+  const buffered = materializeAudioBuffer(audio);
+  if (buffered) {
+    buffer = await buffered;
   } else if (audio.url) {
     if (!isValidUrl(audio.url)) {
       return {

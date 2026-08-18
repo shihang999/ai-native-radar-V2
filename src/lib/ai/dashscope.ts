@@ -1,3 +1,12 @@
+import {
+  DASHSCOPE_API_KEY,
+  DASHSCOPE_DEPLOYMENT_ID_TEXT,
+  DASHSCOPE_DEPLOYMENT_ID_VL,
+  DASHSCOPE_ENDPOINT,
+  DASHSCOPE_LLM_MODEL,
+  DASHSCOPE_VL_ENDPOINT,
+  DASHSCOPE_VL_MODEL,
+} from '@/lib/ai/env';
 import { buildSystemPrompt, buildUserPromptImage, buildUserPromptText, buildUserPromptVoice } from '@/lib/ai/prompt';
 import { extractJsonBlob, validateAndNormalizeParsedItems } from '@/lib/ai/schema';
 import {
@@ -13,16 +22,19 @@ import type {
   RecommendationRating,
 } from './types';
 
-const DASHSCOPE_API_KEY = process.env.DASHSCOPE_API_KEY ?? '';
-const LLM_MODEL = process.env.DASHSCOPE_LLM_MODEL ?? 'qwen-plus';
-const VL_MODEL = process.env.DASHSCOPE_VL_MODEL ?? 'qwen-vl-max';
-const DASHSCOPE_ENDPOINT = process.env.DASHSCOPE_ENDPOINT ?? 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation';
-const VL_ENDPOINT = process.env.DASHSCOPE_VL_ENDPOINT ?? 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
-
 const MAX_TOKENS = 4000;
 const TEMPERATURE = 0.1;
 const TOP_P = 0.7;
 const MAX_RETRIES = 1;
+
+type CompatibleChatMessage = {
+  role: 'system' | 'user';
+  content: string | CompatibleContentPart[];
+};
+
+type CompatibleContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
 
 export interface DashScopeCallResult<T = unknown> {
   status: 'ok' | 'invalid_json' | 'rate_limited' | 'error';
@@ -34,36 +46,63 @@ export interface DashScopeCallResult<T = unknown> {
   originalItemsCount?: number;
 }
 
-function dashscopeHeaders() {
+function normalizeUrlWithPath(base: string, suffix: string): string {
+  if (!base) return base;
+  if (!(base.startsWith('http://') || base.startsWith('https://'))) return base;
+  try {
+    const url = new URL(base);
+    const pathname = url.pathname.replace(/\/+$/, '');
+    if (!pathname) return `${url.origin}${suffix}`;
+    if (pathname.endsWith('/chat/completions') || pathname.endsWith('/generation')) return base;
+    if (pathname.endsWith('/compatible-mode/v1')) return `${url.origin}${pathname}/chat/completions`;
+    if (pathname.endsWith('/api/v1')) return `${url.origin}${suffix}`;
+    return base;
+  } catch {
+    return base;
+  }
+}
+
+function getCompatibleEndpoint(isImage: boolean): string {
+  const base = isImage ? DASHSCOPE_VL_ENDPOINT : DASHSCOPE_ENDPOINT;
+  return normalizeUrlWithPath(base, '/compatible-mode/v1/chat/completions');
+}
+
+function dashscopeHeaders(extra: Record<string, string> = {}) {
   return {
     Authorization: `Bearer ${DASHSCOPE_API_KEY}`,
     'Content-Type': 'application/json',
+    ...extra,
   };
 }
 
-async function callJson(messages: Array<{ role: 'system' | 'user'; content: unknown }>, inputMode: InputMode, isImage = false): Promise<DashScopeCallResult> {
-  const started = Date.now();
+function getModel(isImage: boolean): string {
+  const deploymentId = isImage ? DASHSCOPE_DEPLOYMENT_ID_VL : DASHSCOPE_DEPLOYMENT_ID_TEXT;
+  return deploymentId || (isImage ? DASHSCOPE_VL_MODEL : DASHSCOPE_LLM_MODEL);
+}
+
+async function callCompatibleChat(
+  messages: CompatibleChatMessage[],
+  inputMode: InputMode,
+  isImage = false,
+): Promise<DashScopeCallResult> {
   let retries = 0;
   let lastErr: unknown;
+
   do {
     try {
-      const model = isImage ? VL_MODEL : LLM_MODEL;
-      const endpoint = isImage ? VL_ENDPOINT : DASHSCOPE_ENDPOINT;
-      const body: Record<string, unknown> = {
-        model,
-        input: { messages },
-        parameters: {
+      const res = await fetch(getCompatibleEndpoint(isImage), {
+        method: 'POST',
+        headers: dashscopeHeaders(),
+        body: JSON.stringify({
+          model: getModel(isImage),
+          messages,
           temperature: TEMPERATURE,
           top_p: TOP_P,
           max_tokens: MAX_TOKENS,
-          result_format: 'message',
-        },
-      };
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: dashscopeHeaders(),
-        body: JSON.stringify(body),
+          stream: false,
+          enable_thinking: false,
+          response_format: { type: 'json_object' },
+        }),
       });
 
       if (res.status === 429) {
@@ -138,48 +177,62 @@ async function callJson(messages: Array<{ role: 'system' | 'user'; content: unkn
   };
 }
 
+function extractTextParts(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((part) => {
+      if (typeof part === 'string') return part;
+      if (!part || typeof part !== 'object') return '';
+      const text = (part as { text?: unknown }).text;
+      return typeof text === 'string' ? text : '';
+    })
+    .join('');
+}
+
 function extractAssistantMessage(json: Record<string, unknown>): string | null {
   try {
+    const choices = (json as { choices?: unknown[] }).choices;
+    const firstChoice = Array.isArray(choices) ? choices[0] : null;
+    if (firstChoice && typeof firstChoice === 'object') {
+      const message = (firstChoice as { message?: unknown }).message;
+      if (message && typeof message === 'object') {
+        const content = (message as { content?: unknown }).content;
+        const text = extractTextParts(content);
+        if (text) return text;
+      }
+    }
+
     const output = (json as { output?: unknown }).output;
     if (!output || typeof output !== 'object') return null;
-    const choices = (output as { choices?: unknown[] }).choices ?? [];
-    const first = choices[0];
+    const outputChoices = (output as { choices?: unknown[] }).choices ?? [];
+    const first = outputChoices[0];
     if (!first || typeof first !== 'object') return null;
     const message = (first as { message?: unknown }).message;
     if (!message || typeof message !== 'object') return null;
     const content = (message as { content?: unknown }).content;
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      return content
-        .map((c) => {
-          if (typeof c === 'string') return c;
-          if (c && typeof c === 'object') {
-            const t = (c as { text?: unknown }).text;
-            return typeof t === 'string' ? t : '';
-          }
-          return '';
-        })
-        .join('');
-    }
+    const text = extractTextParts(content);
+    return text || null;
   } catch {
-    /* ignore */
+    return null;
   }
-  return null;
 }
 
 export async function dashscopeCallText(rawText: string): Promise<DashScopeCallResult> {
-  const messages: Array<{ role: 'system' | 'user'; content: unknown }> = [
-    { role: 'system', content: buildSystemPrompt() },
-    { role: 'user', content: buildUserPromptText(rawText) },
-  ];
-  const result = await callJson(messages, 'text');
+  const result = await callCompatibleChat(
+    [
+      { role: 'system', content: buildSystemPrompt() },
+      { role: 'user', content: buildUserPromptText(rawText) },
+    ],
+    'text',
+  );
   if (result.status === 'invalid_json') {
     return {
       status: 'invalid_json',
       items: result.items ?? [],
       error: buildUserError(
         'PARSE_EMPTY_OR_INVALID',
-        `parse-duration:${Date.now()}`,
+        'compatible chat json invalid',
         '没识别到可推荐的资料，请补充完整书名（和推荐理由），或直接手工新增一本',
       ),
     };
@@ -188,53 +241,65 @@ export async function dashscopeCallText(rawText: string): Promise<DashScopeCallR
 }
 
 export interface ImageContentItem {
-  /** DashScope 图片输入：支持 URL 或 base64 data URI */
   image: string;
 }
 
-export async function dashscopeCallVision(images: ImageContentItem[]): Promise<DashScopeCallResult & { ocr_text_snapshot?: string }> {
-  const systemPrompt = buildSystemPrompt();
-  const userPromptText = buildUserPromptImage();
-  const content: unknown[] = [{ text: systemPrompt + '\n\n---\n\nUSER_INSTRUCTION:\n' + userPromptText }];
-  for (const img of images) {
-    content.push(img);
-  }
-  const messages: Array<{ role: 'system' | 'user'; content: unknown }> = [
-    { role: 'user', content },
+export async function dashscopeCallVision(
+  images: ImageContentItem[],
+): Promise<DashScopeCallResult & { ocr_text_snapshot?: string }> {
+  const userContent: CompatibleContentPart[] = [
+    { type: 'text', text: buildUserPromptImage() },
+    ...images.map((img) => ({
+      type: 'image_url' as const,
+      image_url: { url: img.image },
+    })),
   ];
-  const raw = await callJson(messages, 'image', true);
+
+  const raw = await callCompatibleChat(
+    [
+      { role: 'system', content: buildSystemPrompt() },
+      { role: 'user', content: userContent },
+    ],
+    'image',
+    true,
+  );
+
   const ocr_text_snapshot = raw.items
     ?.map((it) => `${it.title ?? ''} ${it.author ?? ''}\n${it.reason_summary ?? ''}\n${it.raw_source_excerpt ?? ''}`)
     .join('\n\n')
     .trim();
+
   if (raw.status === 'invalid_json') {
     return {
       ...raw,
       status: 'invalid_json',
       error: buildUserError(
         'OCR_EMPTY',
-        `parse-duration:${Date.now()}`,
+        'compatible vision json invalid',
         '图片未能识别出明确的推荐书籍/课程，请裁剪清楚文字区域或改用粘贴文本',
       ),
       ocr_text_snapshot,
     };
   }
+
   return { ...raw, ocr_text_snapshot };
 }
 
 export async function dashscopeCallVoiceAsrText(asrText: string): Promise<DashScopeCallResult> {
-  const messages: Array<{ role: 'system' | 'user'; content: unknown }> = [
-    { role: 'system', content: buildSystemPrompt() },
-    { role: 'user', content: buildUserPromptVoice(asrText) },
-  ];
-  const result = await callJson(messages, 'voice');
+  const result = await callCompatibleChat(
+    [
+      { role: 'system', content: buildSystemPrompt() },
+      { role: 'user', content: buildUserPromptVoice(asrText) },
+    ],
+    'voice',
+  );
   if (result.status === 'invalid_json') {
     return {
       status: 'invalid_json',
       items: result.items ?? [],
       error: buildUserError(
         'VOICE_PARSE_EMPTY',
-        `parse-duration:${Date.now()}`,
+        'compatible voice json invalid',
         '语音没能识别出明确的推荐资料，建议改用粘贴文本，或对着麦克风说清楚书名',
       ),
     };

@@ -16,10 +16,18 @@ export const DASHSCOPE_VL_MODEL = readEnv('DASHSCOPE_VL_MODEL', false, 'qwen-vl-
 export const DASHSCOPE_ENDPOINT = readEnv(
   'DASHSCOPE_ENDPOINT',
   false,
-  'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+  'https://dashscope.aliyuncs.com/compatible-mode/v1',
 );
 export const DASHSCOPE_VL_ENDPOINT = readEnv(
   'DASHSCOPE_VL_ENDPOINT',
+  false,
+  'https://dashscope.aliyuncs.com/compatible-mode/v1',
+);
+export const DASHSCOPE_DEPLOYMENT_ID_TEXT = readEnv('DASHSCOPE_DEPLOYMENT_ID_TEXT', false, '');
+export const DASHSCOPE_DEPLOYMENT_ID_VL = readEnv('DASHSCOPE_DEPLOYMENT_ID_VL', false, '');
+export const DASHSCOPE_ASR_MODEL = readEnv('DASHSCOPE_ASR_MODEL', false, 'qwen-audio-3.0-asr-flash');
+export const DASHSCOPE_ASR_ENDPOINT = readEnv(
+  'DASHSCOPE_ASR_ENDPOINT',
   false,
   'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
 );
