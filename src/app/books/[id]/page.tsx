@@ -1,10 +1,10 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { getResourceById, getRelatedResources, recordView } from "@/lib/api/resources";
 import { getDomainById, getRingById } from "@/lib/constants";
 import { RatingSection } from "@/components/books/RatingSection";
+import { BookCover } from "@/components/books/BookCover";
 
 interface BookDetailPageProps {
   params: Promise<{ id: string }>;
@@ -77,27 +77,17 @@ export default async function BookDetailPage({ params }: BookDetailPageProps) {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
           {/* 左侧：封面和基础信息 */}
           <div className="space-y-6">
-            {/* 封面大图 */}
+            {/* 封面大图：DB 封面 > Open Library（按 ISBN）> 本地占位图 */}
             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-white shadow-lg">
-              {resource.cover_image_url ? (
-                <Image
-                  src={resource.cover_image_url}
-                  alt={resource.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 380px"
-                  priority
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#E2E8F0] to-[#F5F5F6]">
-                  <div className="text-center">
-                    <div className="mb-2 text-6xl font-bold text-[#CBD5E1]">
-                      {resource.title.charAt(0)}
-                    </div>
-                    <p className="text-sm text-[#94A3B8]">暂无封面</p>
-                  </div>
-                </div>
-              )}
+              <BookCover
+                coverImageUrl={resource.cover_image_url}
+                isbn={resource.isbn}
+                title={resource.title}
+                size="L"
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 380px"
+                priority
+              />
             </div>
 
             {/* 用户评分区 */}

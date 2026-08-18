@@ -301,7 +301,9 @@ export function Blip({
               width={hoverRadiusCap * 2}
               height={hoverRadiusCap * 2}
               preserveAspectRatio="xMidYMid slice"
-              clipPath={`circle(${hoverRadiusCap}px at ${x} ${y})`}
+              // 注意：CSS clip-path 基本形状的坐标相对元素自身包围盒解析，
+              // 不能用 SVG 用户坐标；image 与圆点同尺寸同心，用百分比即可裁出圆形
+              clipPath={`circle(50% at 50% 50%)`}
               style={{
                 pointerEvents: "none",
                 opacity: fullyActive ? 1 : 0,
