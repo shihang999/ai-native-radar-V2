@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { type Book, getDomainById, getRingById } from "@/lib/constants";
 
 interface BookTooltipProps {
@@ -7,14 +10,35 @@ interface BookTooltipProps {
   mouseY: number;
   /** 是否来自系统自动 Spotlight（true 时附加一个轻微 "自动播放中" 视觉标识） */
   autoSpotlight?: boolean;
+  /** 自动 Spotlight 进入 exit 阶段时为 true，触发淡出动画 */
+  leaving?: boolean;
 }
+
+/** Popup 淡入/淡出 + 上浮动画时长（ms，处于 200~400ms 区间） */
+const TOOLTIP_TRANSITION_MS = 300;
 
 /**
  * 雷达点位 Tooltip 组件
  *  - 自动 spotlight 与用户 hover 完全复用同一个组件
+ *  - 挂载后淡入 + 上浮出现；leaving 时淡出（自动 Spotlight exit 阶段）
  *  - 根据基准点自动判断 Tooltip 显示方向，避免超出视口边界
  */
-export function BookTooltip({ book, mouseX, mouseY, autoSpotlight = false }: BookTooltipProps) {
+export function BookTooltip({ book, mouseX, mouseY, autoSpotlight = false, leaving = false }: BookTooltipProps) {
+  const [entered, setEntered] = useState(false);
+
+  // 挂载后下一帧再置为可见，触发 CSS transition 淡入/上浮
+  useEffect(() => {
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setEntered(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, []);
+
+  const shown = entered && !leaving;
   const domain = getDomainById(book.domainId);
   const ring = getRingById(book.ringId);
 
@@ -55,11 +79,16 @@ export function BookTooltip({ book, mouseX, mouseY, autoSpotlight = false }: Boo
 
   return (
     <div
-      className={`fixed z-50 pointer-events-none ${autoSpotlight ? "animate-in fade-in zoom-in-95 duration-300" : "animate-in fade-in-0 zoom-in-95 duration-200"}`}
+      className="fixed z-50 pointer-events-none"
       style={{
         left: `${left}px`,
         top: `${top}px`,
         width: `${tooltipWidth}px`,
+        opacity: shown ? 1 : 0,
+        transform: shown ? "translateY(0)" : "translateY(10px)",
+        transition: `opacity ${TOOLTIP_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), transform ${TOOLTIP_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        // 自动 Spotlight 时略延迟，等封面出现后再淡入 Popup；淡出不延迟
+        transitionDelay: autoSpotlight && !leaving ? "120ms" : "0ms",
       }}
     >
       <div className="rounded-lg border border-[#E2E8F0] bg-white p-4 shadow-lg">

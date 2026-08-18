@@ -18,6 +18,8 @@ interface BlipProps {
   groupCount: number;
   /** 是否为系统自动 Spotlight（会触发放大+封面+高亮） */
   isAutoSpotlight?: boolean;
+  /** 自动 Spotlight 当前动画阶段：enter（轻微放大+高亮）/ dwell（封面+Popup）/ exit（恢复） */
+  autoSpotlightPhase?: "enter" | "dwell" | "exit";
   /** 是否为用户真实 hover 或系统自动 Spotlight 的「当前展示点」 */
   isActive?: boolean;
   highlightState?:
@@ -152,6 +154,7 @@ export function Blip({
   groupIndex,
   groupCount,
   isAutoSpotlight = false,
+  autoSpotlightPhase = "dwell",
   isActive: externalActive,
   highlightState = "none",
   onHover,
@@ -206,8 +209,23 @@ export function Blip({
   const opacity = getOpacity();
   const scale = getScale();
   const isHighlighted = highlightState === "self";
-  const activeness = isHovered || isAutoSpotlight || externalActive;
-  const currentRadius = activeness ? hoverRadiusCap : baseRadius * scale;
+
+  // 自动 Spotlight 动画阶段：enter（轻微放大+高亮+编号淡出）→ dwell（封面+Popup）→ exit（恢复）
+  const autoStage: "none" | "enter" | "dwell" | "exit" = isAutoSpotlight
+    ? autoSpotlightPhase
+    : "none";
+  // 真实 hover（自动 Spotlight 点位走 autoStage 分阶段动画）
+  const hoverActive = isHovered || (!isAutoSpotlight && externalActive);
+  // 「完全激活」：展示封面缩略图 + Popup
+  const fullyActive = hoverActive || autoStage === "dwell";
+  // 高亮描边/轻微放大可见阶段
+  const emphasized = hoverActive || autoStage === "enter" || autoStage === "dwell";
+
+  const currentRadius = fullyActive
+    ? hoverRadiusCap
+    : autoStage === "enter"
+      ? baseRadius * 1.35 // 轻微放大
+      : baseRadius * scale;
   const currentRingRadius = baseRingRadius * scale;
   const numberFontSize = Math.min(14, Math.max(10, Math.round(baseRadius + 1)));
 
@@ -222,21 +240,20 @@ export function Blip({
         transition: `opacity ${transitionMs}ms ${easing}`,
       }}
     >
-      {/* 外圆环（行星环效果） - 非 active 状态显示 */}
-      {!activeness && (
-        <circle
-          cx={x}
-          cy={y}
-          r={currentRingRadius}
-          fill="none"
-          stroke={color}
-          strokeWidth={1.5}
-          opacity={0.3}
-          style={{
-            transition: `r ${transitionMs}ms ${easing}, opacity ${transitionMs}ms ${easing}`,
-          }}
-        />
-      )}
+      {/* 外圆环（行星环效果） - active 阶段淡出 */}
+      <circle
+        cx={x}
+        cy={y}
+        r={currentRingRadius}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        style={{
+          pointerEvents: "none",
+          opacity: emphasized ? 0 : 0.3,
+          transition: `opacity ${transitionMs}ms ${easing}`,
+        }}
+      />
 
       {/* Spotlight 外环高亮脉冲 */}
       {isAutoSpotlight && !isHovered && (
@@ -247,9 +264,9 @@ export function Blip({
           fill="none"
           stroke={color}
           strokeWidth={2}
-          opacity={0.75}
           style={{
             pointerEvents: "none",
+            opacity: autoStage === "exit" ? 0 : 0.75,
             transition: `r ${transitionMs}ms ${easing}, opacity ${transitionMs}ms ${easing}`,
           }}
         />
@@ -260,20 +277,21 @@ export function Blip({
         cx={x}
         cy={y}
         r={currentRadius}
-        fill={activeness && book.coverImageUrl ? "transparent" : color}
-        stroke={isHighlighted || activeness ? "#FFFFFF" : "none"}
-        strokeWidth={isHighlighted ? 2.5 : activeness ? 2 : 0}
+        fill={fullyActive && book.coverImageUrl ? "transparent" : color}
+        stroke="#FFFFFF"
+        strokeOpacity={isHighlighted || emphasized ? 1 : 0}
+        strokeWidth={isHighlighted ? 2.5 : emphasized ? 2 : 0}
         style={{
           cursor: "pointer",
-          transition: `r ${transitionMs}ms ${easing}, stroke ${transitionMs}ms ${easing}, fill ${transitionMs}ms ${easing}`,
+          transition: `r ${transitionMs}ms ${easing}, stroke-opacity ${transitionMs}ms ${easing}, stroke-width ${transitionMs}ms ${easing}, fill ${transitionMs}ms ${easing}`,
         }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       />
 
-      {/* active 时显示封面图或领域色背景（Spotlight 和 Hover 完全一致） */}
-      {activeness && (
+      {/* 封面缩略图：进入 active 周期时挂载，通过 opacity 淡入/淡出（Spotlight 和 Hover 一致） */}
+      {(hoverActive || autoStage !== "none") && (
         <>
           {book.coverImageUrl ? (
             <image
@@ -286,6 +304,7 @@ export function Blip({
               clipPath={`circle(${hoverRadiusCap}px at ${x} ${y})`}
               style={{
                 pointerEvents: "none",
+                opacity: fullyActive ? 1 : 0,
                 transition: `opacity ${transitionMs}ms ${easing}`,
               }}
             />
@@ -295,9 +314,9 @@ export function Blip({
               cy={y}
               r={hoverRadiusCap}
               fill={color}
-              opacity={0.8}
               style={{
                 pointerEvents: "none",
+                opacity: fullyActive ? 0.8 : 0,
                 transition: `opacity ${transitionMs}ms ${easing}`,
               }}
             />
@@ -305,27 +324,26 @@ export function Blip({
         </>
       )}
 
-      {/* 数字ID - 非 active 状态显示 */}
-      {!activeness && (
-        <text
-          x={x}
-          y={y}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={numberFontSize}
-          fill="#FFFFFF"
-          fontWeight="600"
-          style={{
-            pointerEvents: "none",
-            transition: `opacity ${transitionMs}ms ${easing}`,
-          }}
-        >
-          {domainNumber}
-        </text>
-      )}
+      {/* 数字ID - 常驻渲染，active 时淡出、退出时淡入 */}
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={numberFontSize}
+        fill="#FFFFFF"
+        fontWeight="600"
+        style={{
+          pointerEvents: "none",
+          opacity: emphasized ? 0 : 1,
+          transition: `opacity ${transitionMs}ms ${easing}`,
+        }}
+      >
+        {domainNumber}
+      </text>
 
       {/* active 时显示大数字（无封面图时） - Spotlight 和 Hover 完全一致 */}
-      {activeness && !book.coverImageUrl && (
+      {!book.coverImageUrl && (
         <text
           x={x}
           y={y}
@@ -336,6 +354,7 @@ export function Blip({
           fontWeight="600"
           style={{
             pointerEvents: "none",
+            opacity: fullyActive ? 1 : 0,
             transition: `opacity ${transitionMs}ms ${easing}`,
           }}
         >

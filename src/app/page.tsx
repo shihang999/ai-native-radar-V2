@@ -82,77 +82,76 @@ export default async function Home() {
         </p>
       </section>
 
-      {/* 雷达主视觉区 - 一屏展示 */}
+      {/* 雷达主视觉区 - 一屏展示；xl 及以上为三列：左侧解读 + 中间雷达 + 右侧共建 */}
       <section className="mb-10 flex min-h-[calc(100svh-64px)] snap-start items-center justify-center">
-        {hasBooks ? (
-          <div className="w-full max-w-[720px]">
-            <RadarChart books={books} />
-          </div>
-        ) : (
-          <div className="w-full max-w-[720px] rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-8 py-14 text-center">
-            <p className="text-base font-semibold text-[#10213E]">
-              当前暂无可展示的雷达点位
-            </p>
-            <p className="mt-3 text-sm leading-7 text-[#64748B]">
-              只有已审核且推荐指数 4 星及以上的资源会进入首页雷达。你可以先查看书单，或通过“推荐一本书”补充资源。
-            </p>
-          </div>
-        )}
-      </section>
-
-      <div className="border-t border-[#E2E8F0] pb-12 pt-10" />
-
-      {/* 信息栏 */}
-      <section className="grid gap-8 pb-16 md:grid-cols-3">
-        {/* 如何读这张雷达 */}
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-[#10213E]">
-            如何读这张雷达
-          </h2>
-          <dl className="grid gap-2 text-xs leading-6">
-            <div className="border-l-2 border-[#5DB2E2] pl-3">
-              <dt className="font-semibold text-[#10213E]">颜色 = 知识领域</dt>
-              <dd className="text-[#64748B]">不同颜色代表 AI 学习中的不同认知方向。</dd>
+        <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,720px)_240px] xl:items-center xl:justify-center">
+          {/* 左侧：如何读这张雷达 + 学习阶段 */}
+          <aside className="order-2 grid gap-8 xl:order-1">
+            <div>
+              <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
+                如何读这张雷达
+              </h2>
+              <dl className="grid gap-2 text-xs leading-5">
+                <div className="border-l-2 border-[#5DB2E2] pl-3">
+                  <dt className="font-semibold text-[#10213E]">颜色 = 知识领域</dt>
+                  <dd className="text-[#64748B]">不同颜色代表 AI 学习中的不同认知方向。</dd>
+                </div>
+                <div className="border-l-2 border-[#5DB2E2] pl-3">
+                  <dt className="font-semibold text-[#10213E]">圈层 = 学习阶段</dt>
+                  <dd className="text-[#64748B]">越靠近中心越适合作为起点，越靠外越偏进阶。</dd>
+                </div>
+                <div className="border-l-2 border-[#5DB2E2] pl-3">
+                  <dt className="font-semibold text-[#10213E]">点 = 代表性书籍</dt>
+                  <dd className="text-[#64748B]">每个点是一本文本样例，位置表达它的领域和阶段。</dd>
+                </div>
+              </dl>
             </div>
-            <div className="border-l-2 border-[#5DB2E2] pl-3">
-              <dt className="font-semibold text-[#10213E]">圈层 = 学习阶段</dt>
-              <dd className="text-[#64748B]">越靠近中心越适合作为起点，越靠外越偏进阶。</dd>
-            </div>
-            <div className="border-l-2 border-[#5DB2E2] pl-3">
-              <dt className="font-semibold text-[#10213E]">点 = 代表性书籍</dt>
-              <dd className="text-[#64748B]">每个点是一本文本样例，位置表达它的领域和阶段。</dd>
-            </div>
-          </dl>
-        </div>
 
-        {/* 学习阶段 */}
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-[#10213E]">
-            学习阶段
-          </h2>
-          <div className="grid gap-2 text-xs leading-6">
-            {RINGS.map((ring) => (
-              <div key={ring.id} className="border-l-2 border-[#5DB2E2] pl-3">
-                <p className="font-semibold text-[#10213E]">{ring.name}</p>
-                <p className="text-[#64748B]">{ring.description}</p>
+            <div>
+              <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
+                学习阶段
+              </h2>
+              <div className="grid gap-2 text-xs leading-5">
+                {RINGS.map((ring) => (
+                  <div key={ring.id} className="border-l-2 border-[#5DB2E2] pl-3">
+                    <p className="font-semibold text-[#10213E]">{ring.name}</p>
+                    <p className="text-[#64748B]">{ring.description}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 共建意图（非卡片） */}
-        <div>
-          <h2 className="mb-4 text-base font-semibold text-[#10213E]">
-            雷达共建
-          </h2>
-          <div className="grid gap-2 text-xs leading-6">
-            <div className="border-l-2 border-[#5DB2E2] pl-3">
-              <p className="font-semibold text-[#10213E]">推荐资源</p>
-              <p className="text-[#64748B]">
-                你可以推荐一本书/一门课程/一篇文章，推荐会先进入审核；通过后，可能会作为新的点位出现在雷达中。
-              </p>
             </div>
+          </aside>
+
+          {/* 中间：雷达（SVG 及其交互完整保留） */}
+          <div className="order-1 mx-auto w-full max-w-[720px] xl:order-2">
+            {hasBooks ? (
+              <RadarChart books={books} />
+            ) : (
+              <div className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-8 py-14 text-center">
+                <p className="text-base font-semibold text-[#10213E]">
+                  当前暂无可展示的雷达点位
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[#64748B]">
+                  只有已审核且推荐指数 4 星及以上的资源会进入首页雷达。你可以先查看书单，或通过“推荐一本书”补充资源。
+                </p>
+              </div>
+            )}
           </div>
+
+          {/* 右侧：雷达共建 */}
+          <aside className="order-3">
+            <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
+              雷达共建
+            </h2>
+            <div className="grid gap-2 text-xs leading-5">
+              <div className="border-l-2 border-[#5DB2E2] pl-3">
+                <p className="font-semibold text-[#10213E]">推荐资源</p>
+                <p className="text-[#64748B]">
+                  你可以推荐一本书/一门课程/一篇文章，推荐会先进入审核；通过后，可能会作为新的点位出现在雷达中。
+                </p>
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
     </div>

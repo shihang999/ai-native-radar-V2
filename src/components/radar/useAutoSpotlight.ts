@@ -18,13 +18,25 @@ export interface AutoSpotlightConfig {
   disabled?: boolean;
 }
 
+/** 自动 Spotlight 动画阶段：enter → dwell → exit → 激活下一本书 */
+export type SpotlightPhase = "enter" | "dwell" | "exit";
+
+/** enter 阶段时长（ms）：轻微放大 → 高亮 → 编号淡出 → 封面淡入 */
+const ENTER_PHASE_MS = 350;
+/** exit 阶段时长（ms）：Popup 淡出 → 封面缩小 → 恢复普通编号点 */
+const EXIT_PHASE_MS = 350;
+
 export interface AutoSpotlightResult {
   /** 当前自动 spotlight 选中的书，随时可能切换 */
   autoSpotlightBook: Book | null;
+  /** 当前自动 spotlight 所处动画阶段（enter/dwell/exit） */
+  autoSpotlightPhase: SpotlightPhase;
   /** 自动系统是否处于播放中（用户 hover 时会被暂停，变成 false） */
   isSpotlightActive: boolean;
   /** 用户当前 hoveredBook（外部设置进去，用于抢占/暂停/延迟恢复） */
   setExternalHoveredBook: (book: Book | null) => void;
+  /** 鼠标进入/离开雷达区域：进入立即停止自动 spotlight，离开后延迟恢复 */
+  setPointerInsideRadar: (inside: boolean) => void;
 }
 
 interface BookWithPos {
@@ -67,13 +79,19 @@ export function useAutoSpotlight(
   } = config;
 
   const [autoSpotlightBook, setAutoSpotlightBook] = useState<Book | null>(null);
+  const [autoSpotlightPhase, setAutoSpotlightPhase] = useState<SpotlightPhase>("enter");
   const [isSpotlightActive, setIsSpotlightActive] = useState(true);
 
   const lastBookIdRef = useRef<string | null>(null);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
   const hoverCountdownRef = useRef<number | null>(null);
+  const enterTimerRef = useRef<number | null>(null);
   const dwellTimerRef = useRef<number | null>(null);
+  const exitTimerRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<number | null>(null);
+  const spotlightActiveRef = useRef(true);
+  /** 鼠标是否在雷达区域内（由外部通过 setPointerInsideRadar 同步） */
+  const pointerInsideRef = useRef(false);
 
   const booksWithPos = useMemo<BookWithPos[]>(() => {
     const list: BookWithPos[] = [];
@@ -94,10 +112,18 @@ export function useAutoSpotlight(
   const domainSequenceRef = useRef<string[]>(buildDomainRoundRobinSequence(domainList));
   const domainCursorRef = useRef(0);
 
-  function clearDwellTimer() {
+  function clearCycleTimers() {
+    if (enterTimerRef.current != null) {
+      window.clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
     if (dwellTimerRef.current != null) {
       window.clearTimeout(dwellTimerRef.current);
       dwellTimerRef.current = null;
+    }
+    if (exitTimerRef.current != null) {
+      window.clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
     }
   }
 
@@ -165,55 +191,86 @@ export function useAutoSpotlight(
     return picked.b.book;
   };
 
-  const scheduleNext = () => {
-    clearDwellTimer();
-    if (disabled) return;
-    const waitMs = Math.round(randRange(dwellSecondsMin, dwellSecondsMax) * 1000);
-    dwellTimerRef.current = window.setTimeout(() => {
-      const next = pickNext();
-      if (next) {
-        lastBookIdRef.current = next.id;
-        const pos = booksWithPos.find((b) => b.book.id === next.id)?.pos ?? null;
-        lastPosRef.current = pos;
-        setAutoSpotlightBook(next);
-      }
-      scheduleNext();
+  const setSpotlightActive = (v: boolean) => {
+    spotlightActiveRef.current = v;
+    setIsSpotlightActive(v);
+  };
+
+  /**
+   * 启动一本书的完整 spotlight 周期：
+   *  enter（轻微放大 → 高亮 → 编号淡出 → 封面淡入）
+   *  → dwell（停留 3~5s，Popup 淡入展示）
+   *  → exit（Popup 淡出 → 封面缩小 → 恢复普通编号点）
+   *  → 随机激活下一本书
+   */
+  const startCycle = (book: Book) => {
+    clearCycleTimers();
+    lastBookIdRef.current = book.id;
+    lastPosRef.current = booksWithPos.find((b) => b.book.id === book.id)?.pos ?? null;
+    setAutoSpotlightBook(book);
+    setAutoSpotlightPhase("enter");
+    enterTimerRef.current = window.setTimeout(() => {
+      setAutoSpotlightPhase("dwell");
+      const dwellMs = Math.round(randRange(dwellSecondsMin, dwellSecondsMax) * 1000);
+      dwellTimerRef.current = window.setTimeout(() => {
+        setAutoSpotlightPhase("exit");
+        exitTimerRef.current = window.setTimeout(() => {
+          const next = pickNext();
+          if (next) startCycle(next);
+        }, EXIT_PHASE_MS);
+      }, dwellMs);
+    }, ENTER_PHASE_MS);
+  };
+
+  /** 用户离开后延迟恢复自动 spotlight（1~2s 倒计时，期间再有交互则取消） */
+  const scheduleResume = () => {
+    clearResumeTimer();
+    clearHoverCountdown();
+    const waitMs = Math.round(randRange(resumeDelaySecondsMin, resumeDelaySecondsMax) * 1000);
+    hoverCountdownRef.current = window.setTimeout(() => {
+      if (disabled || pointerInsideRef.current) return;
+      setSpotlightActive(true);
+      const first = pickNext();
+      if (first) startCycle(first);
     }, waitMs);
+  };
+
+  const setPointerInsideRadar = (inside: boolean) => {
+    if (pointerInsideRef.current === inside) return;
+    pointerInsideRef.current = inside;
+    if (inside) {
+      // 鼠标进入雷达：马上回到正常模式，清除当前自动聚焦点
+      setSpotlightActive(false);
+      clearCycleTimers();
+      clearResumeTimer();
+      clearHoverCountdown();
+      setAutoSpotlightBook(null);
+    } else {
+      // 鼠标离开雷达：若当前未在播放，延迟恢复
+      if (!spotlightActiveRef.current) scheduleResume();
+    }
   };
 
   const setExternalHoveredBook = (book: Book | null) => {
     if (book) {
       // 用户 hover 任何点：立即暂停
-      setIsSpotlightActive(false);
-      clearDwellTimer();
+      setSpotlightActive(false);
+      clearCycleTimers();
       clearResumeTimer();
       clearHoverCountdown();
       setAutoSpotlightBook((cur) => (cur && cur.id === book.id ? cur : null));
     } else {
-      // 用户离开：先进入倒计时（1~2s），倒计时内再 hover 就取消
-      setIsSpotlightActive(false);
-      clearResumeTimer();
-      clearHoverCountdown();
-      const waitMs = Math.round(randRange(resumeDelaySecondsMin, resumeDelaySecondsMax) * 1000);
-      hoverCountdownRef.current = window.setTimeout(() => {
-        if (disabled) return;
-        setIsSpotlightActive(true);
-        // 恢复立刻随机一本书启动，避免长时间空转
-        const first = pickNext();
-        if (first) {
-          lastBookIdRef.current = first.id;
-          const pos = booksWithPos.find((b) => b.book.id === first.id)?.pos ?? null;
-          lastPosRef.current = pos;
-          setAutoSpotlightBook(first);
-        }
-        scheduleNext();
-      }, waitMs);
+      // 已在自动播放中（例如组件初始挂载），无需重复恢复
+      if (spotlightActiveRef.current) return;
+      // 鼠标仍在雷达区域内：保持暂停，等鼠标完全离开后再恢复
+      if (pointerInsideRef.current) return;
+      scheduleResume();
     }
   };
 
   // 初始化 & books 变化时立刻重置
   useEffect(() => {
-    clearDwellTimer();
+    clearCycleTimers();
     clearResumeTimer();
     clearHoverCountdown();
     domainSequenceRef.current = buildDomainRoundRobinSequence(domainList);
@@ -221,26 +278,20 @@ export function useAutoSpotlight(
 
     if (disabled || booksWithPos.length === 0) {
       setAutoSpotlightBook(null);
-      setIsSpotlightActive(false);
+      setSpotlightActive(false);
       return;
     }
 
     // 首次启动略延迟避免 hydration 抖动
     const startDelay = window.setTimeout(() => {
+      setSpotlightActive(true);
       const first = pickNext();
-      if (first) {
-        lastBookIdRef.current = first.id;
-        const pos = booksWithPos.find((b) => b.book.id === first.id)?.pos ?? null;
-        lastPosRef.current = pos;
-        setAutoSpotlightBook(first);
-        setIsSpotlightActive(true);
-      }
-      scheduleNext();
+      if (first) startCycle(first);
     }, 800);
 
     return () => {
       window.clearTimeout(startDelay);
-      clearDwellTimer();
+      clearCycleTimers();
       clearResumeTimer();
       clearHoverCountdown();
     };
@@ -249,7 +300,9 @@ export function useAutoSpotlight(
 
   return {
     autoSpotlightBook,
+    autoSpotlightPhase,
     isSpotlightActive,
     setExternalHoveredBook,
+    setPointerInsideRadar,
   };
 }
