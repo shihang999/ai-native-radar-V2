@@ -27,7 +27,18 @@ const MAX_IMAGE_MB = 4;
 const MAX_AUDIO_MB = 10;
 const MAX_AUDIO_DURATION_SECONDS = 60;
 
-type AudioMime = 'audio/mpeg' | 'audio/wav' | 'audio/mp4';
+type AudioMime =
+  | 'audio/mpeg'
+  | 'audio/mp3'
+  | 'audio/wav'
+  | 'audio/wave'
+  | 'audio/x-wav'
+  | 'audio/mp4'
+  | 'audio/x-m4a'
+  | 'audio/aac'
+  | 'audio/webm'
+  | 'audio/ogg'
+  | 'audio/vorbis';
 
 interface CoerceResult {
   mode: unknown;
@@ -49,9 +60,12 @@ interface ImageLocal {
 }
 
 function toAudioMime(raw: string): AudioMime | undefined {
-  if (raw.includes('mpeg') || raw.includes('mp3')) return 'audio/mpeg';
-  if (raw.includes('wav')) return 'audio/wav';
-  if (raw.includes('mp4') || raw.includes('m4a')) return 'audio/mp4';
+  const r = raw.toLowerCase();
+  if (r.includes('mpeg') || r.includes('mp3')) return 'audio/mpeg';
+  if (r.includes('wav') || r.includes('wave')) return 'audio/wav';
+  if (r.includes('mp4') || r.includes('m4a') || r.includes('aac')) return 'audio/mp4';
+  if (r.includes('webm')) return 'audio/webm';
+  if (r.includes('ogg') || r.includes('vorbis')) return 'audio/ogg';
   return undefined;
 }
 

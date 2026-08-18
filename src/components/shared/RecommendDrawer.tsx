@@ -549,11 +549,18 @@ function StepDot(props: { active?: boolean; label: string }) {
 
 type ImageItem = { mime: "image/png" | "image/jpeg" | "image/webp"; data_base64: string; name?: string };
 
+function canParseMode(mode: InputMode, rawText: string, images: ImageItem[], audioBlob: Blob | null): boolean {
+  if (mode === "text") return rawText.trim().length > 0;
+  if (mode === "image") return images.length > 0;
+  if (mode === "voice") return !!audioBlob;
+  return false;
+}
+
 function ModePanel(props: {
   mode: InputMode;
   setMode: (m: InputMode) => void;
   rawText: string;
-  setRawText: (s: string) => void;
+  setRawText: React.Dispatch<React.SetStateAction<string>>;
   images: ImageItem[];
   setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>;
   acceptImageFiles: (files: FileList | File[]) => void;
@@ -568,23 +575,37 @@ function ModePanel(props: {
   onJumpToManual: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const canParse = canParseMode(props.mode, props.rawText, props.images, props.audioBlob);
 
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
       const imgList: File[] = [];
+      const textPromises: Array<Promise<string>> = [];
       for (let i = 0; i < items.length; i += 1) {
         const it = items[i];
         if (it.kind === "file" && it.type.startsWith("image/")) {
           const f = it.getAsFile();
           if (f) imgList.push(f);
+        } else if (it.kind === "string" && it.type === "text/plain") {
+          textPromises.push(new Promise<string>((resolve) => it.getAsString(resolve)));
         }
       }
       if (imgList.length > 0) {
         e.preventDefault();
         props.acceptImageFiles(imgList);
         props.setMode("image");
+        return;
+      }
+      if (textPromises.length > 0) {
+        e.preventDefault();
+        Promise.all(textPromises).then((chunks) => {
+          const joined = chunks.join("\n").trim();
+          if (joined.length === 0) return;
+          props.setRawText((prev: string) => (prev ? prev + "\n" + joined : joined));
+          props.setMode("text");
+        });
       }
     };
     window.addEventListener("paste", handler);
@@ -701,20 +722,25 @@ function ModePanel(props: {
                 </button>
               )}
               {props.audioBlob && (
-                <div className="flex flex-col items-center gap-2">
-                  <audio controls src={URL.createObjectURL(props.audioBlob)} className="h-10" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      props.setAudioBlob(null);
-                    }}
-                    className="text-xs text-[#64748B] underline hover:text-[#5DB2E2]"
-                  >
-                    重新录制
-                  </button>
-                  {props.audioDurationSec != null && (
-                    <div className="text-xs text-[#94A3B8]">时长约 {props.audioDurationSec} 秒</div>
-                  )}
+                <div className="flex flex-col items-center gap-2 w-full">
+                  <audio controls src={URL.createObjectURL(props.audioBlob)} className="h-10 w-full max-w-sm" />
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        props.setAudioBlob(null);
+                      }}
+                      className="text-xs text-[#64748B] underline hover:text-[#5DB2E2]"
+                    >
+                      重新录制
+                    </button>
+                    {props.audioDurationSec != null && (
+                      <span className="text-xs text-[#94A3B8]">时长约 {props.audioDurationSec} 秒</span>
+                    )}
+                    <span className="text-xs text-[#94A3B8]">
+                      · 浏览器录制格式，无需手动转码
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -740,10 +766,19 @@ function ModePanel(props: {
         <button
           type="button"
           onClick={props.onParse}
-          disabled={props.parsing}
-          className="flex-1 rounded-lg bg-[#5DB2E2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4A9FD8] disabled:opacity-60"
+          disabled={props.parsing || !canParse}
+          title={canParse ? "" : props.mode === "text" ? "请先粘贴推荐内容" : props.mode === "image" ? "请先上传或粘贴图片" : "请先录制一段语音"}
+          className="flex-1 rounded-lg bg-[#5DB2E2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4A9FD8] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {props.parsing ? "解析中…请稍候" : "AI 解析并预览"}
+          {props.parsing
+            ? "解析中…请稍候"
+            : canParse
+              ? "AI 解析并预览"
+              : props.mode === "text"
+                ? "请先粘贴推荐内容"
+                : props.mode === "image"
+                  ? "请先上传或粘贴图片"
+                  : "请先录制一段语音"}
         </button>
       </div>
     </div>
@@ -984,17 +1019,17 @@ function PreviewCard(props: {
   const it = props.item;
   const low = (n?: number | null) => typeof n === "number" && n < 0.65;
   return (
-    <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+    <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] antialiased [text-rendering:optimizeLegibility]">
       <div className="mb-3 flex items-center justify-between">
-        <div className="inline-flex items-center gap-2 rounded-full bg-[#5DB2E2]/10 px-2.5 py-1 text-xs font-medium text-[#5DB2E2]">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#5DB2E2]/10 px-2.5 py-1 text-xs font-semibold text-[#0369A1]">
           第 {props.index + 1} 本
-          {it.is_new_blank && <span className="text-[#94A3B8]">（空白）</span>}
+          {it.is_new_blank && <span className="text-[#64748B]">（空白）</span>}
         </div>
         <button
           type="button"
           onClick={props.onRemove}
           disabled={!props.canRemove}
-          className="text-xs text-[#94A3B8] transition hover:text-[#EF4444] disabled:opacity-40"
+          className="text-xs font-medium text-[#64748B] transition hover:text-[#EF4444] disabled:opacity-40"
         >
           删除这本
         </button>
@@ -1005,7 +1040,7 @@ function PreviewCard(props: {
             type="text"
             value={it.title}
             onChange={(e) => props.update({ title: e.target.value })}
-            className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             placeholder="书名或课程/文章名称"
           />
         </FieldWithWarn>
@@ -1015,7 +1050,7 @@ function PreviewCard(props: {
               type="text"
               value={it.author ?? ""}
               onChange={(e) => props.update({ author: e.target.value || null })}
-              className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
               placeholder="未识别可留空"
             />
           </FieldWithWarn>
@@ -1023,7 +1058,7 @@ function PreviewCard(props: {
             <select
               value={it.resource_type}
               onChange={(e) => props.update({ resource_type: e.target.value as ResourceType })}
-              className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             >
               {RESOURCE_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -1038,7 +1073,7 @@ function PreviewCard(props: {
             type="url"
             value={it.resource_url ?? ""}
             onChange={(e) => props.update({ resource_url: e.target.value || null })}
-            className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             placeholder="https://...（可留空）"
           />
         </FieldWithWarn>
@@ -1047,7 +1082,7 @@ function PreviewCard(props: {
             <select
               value={it.domain_id}
               onChange={(e) => props.update({ domain_id: e.target.value })}
-              className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             >
               <option value="">请选择领域</option>
               {DOMAINS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1057,7 +1092,7 @@ function PreviewCard(props: {
             <select
               value={it.ring_id}
               onChange={(e) => props.update({ ring_id: e.target.value as FormItem["ring_id"] })}
-              className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             >
               {RINGS.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
@@ -1070,12 +1105,12 @@ function PreviewCard(props: {
                 key={star}
                 type="button"
                 onClick={() => props.update({ rating: (it.rating === star ? "" : star) as FormItem["rating"] })}
-                className="flex h-9 w-9 items-center justify-center rounded-lg transition hover:bg-[#F5F5F6]"
+                className="flex h-10 w-10 items-center justify-center rounded-lg transition hover:bg-[#F5F5F6]"
               >
                 <svg
                   className={
-                    "h-5 w-5 " +
-                    (it.rating && it.rating >= star ? "fill-[#F59E0B] text-[#F59E0B]" : "text-[#E2E8F0]")
+                    "h-6 w-6 " +
+                    (it.rating && it.rating >= star ? "fill-[#F59E0B] text-[#F59E0B]" : "text-[#CBD5E1]")
                   }
                   fill="currentColor"
                   viewBox="0 0 24 24"
@@ -1091,13 +1126,13 @@ function PreviewCard(props: {
             rows={3}
             value={it.reason}
             onChange={(e) => props.update({ reason: e.target.value })}
-            className="w-full rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
             placeholder="保留了你原文的推荐理由，可直接编辑；至少 5 个字"
           />
         </FieldWithWarn>
         {it.raw_source_excerpt && (
-          <details className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-xs text-[#64748B]">
-            <summary>🔍 原始摘录（供审核对照）</summary>
+          <details className="rounded-lg bg-[#F8FAFC] px-3 py-2 text-[13px] leading-6 text-[#334155]">
+            <summary className="cursor-pointer font-medium text-[#475569]">🔍 原始摘录（供审核对照）</summary>
             <div className="mt-1 whitespace-pre-wrap">{it.raw_source_excerpt}</div>
           </details>
         )}
@@ -1109,11 +1144,11 @@ function PreviewCard(props: {
 function FieldWithWarn(props: { label: string; required?: boolean; warn?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 flex items-center gap-1 text-xs font-medium text-[#10213E]">
+      <span className="mb-1.5 flex items-center gap-1 text-[13px] leading-5 font-semibold text-[#0F172A]">
         {props.label}
         {props.required && <span className="text-[#E63946]">*</span>}
         {props.warn && (
-          <span title="AI 不太确定，建议核对" className="text-[#F59E0B]">⚠️ AI 低置信</span>
+          <span title="AI 不太确定，建议核对" className="text-[#B45309] font-medium">⚠️ AI 低置信</span>
         )}
       </span>
       {props.children}
