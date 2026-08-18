@@ -153,6 +153,8 @@ export function RadarChart({ books }: RadarChartProps) {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [hoveredDomainId, setHoveredDomainId] = useState<string | null>(null);
+  /** 鼠标是否在雷达圆形区域内（进入即暂停自动 spotlight） */
+  const [pointerInside, setPointerInside] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const displayBooks = useMemo(() => {
@@ -214,11 +216,13 @@ export function RadarChart({ books }: RadarChartProps) {
     [bookPositionMap],
   );
 
-  // Auto Spotlight（系统自动随机聚焦）
+  // Auto Spotlight（系统自动随机聚焦，含 enter/dwell/exit 动画阶段）
   const {
     autoSpotlightBook,
+    autoSpotlightPhase,
     isSpotlightActive,
     setExternalHoveredBook,
+    setPointerInsideRadar,
   } = useAutoSpotlight(displayBooks, {
     getBookPosition,
     disabled: !!selectedBook,
@@ -232,6 +236,11 @@ export function RadarChart({ books }: RadarChartProps) {
   useEffect(() => {
     setExternalHoveredBook(hoveredBook);
   }, [hoveredBook, setExternalHoveredBook]);
+
+  // 鼠标进入雷达区域：马上回到正常模式；离开后延迟恢复自动播放
+  useEffect(() => {
+    setPointerInsideRadar(pointerInside);
+  }, [pointerInside, setPointerInsideRadar]);
 
   // 追踪鼠标位置（用于真实 hover 时 tooltip 定位）
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -255,7 +264,10 @@ export function RadarChart({ books }: RadarChartProps) {
     const dy = y - centerY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist > maxRadius) {
+    const inside = dist <= maxRadius;
+    setPointerInside(inside);
+
+    if (!inside) {
       setHoveredDomainId(null);
       setHoveredBook(null);
       return;
@@ -314,6 +326,7 @@ export function RadarChart({ books }: RadarChartProps) {
         onMouseLeave={() => {
           setHoveredDomainId(null);
           setHoveredBook(null);
+          setPointerInside(false);
         }}
       >
         {/* 扇面高亮（hover 或 自动spotlight 时启用） */}
@@ -369,6 +382,7 @@ export function RadarChart({ books }: RadarChartProps) {
               groupIndex={groupIndex}
               groupCount={groupCount}
               isAutoSpotlight={isAuto}
+              autoSpotlightPhase={isAuto ? autoSpotlightPhase : undefined}
               isActive={isSelf}
               onHover={setHoveredBook}
               onClick={setSelectedBook}
@@ -377,7 +391,7 @@ export function RadarChart({ books }: RadarChartProps) {
         })}
       </svg>
 
-      {/* 悬浮卡片：自动 spotlight 和 真实 hover 共用同一个组件 */}
+      {/* 悬浮卡片：自动 spotlight 和 真实 hover 共用同一个组件；exit 阶段保持挂载并淡出 */}
       {effectiveShownBook && !selectedBook && tooltipAnchor && (
         <BookTooltip
           key={`tooltip-${effectiveShownBook.id}-${shownIsAuto ? "auto" : "hover"}`}
@@ -385,6 +399,7 @@ export function RadarChart({ books }: RadarChartProps) {
           mouseX={tooltipAnchor.x}
           mouseY={tooltipAnchor.y}
           autoSpotlight={shownIsAuto}
+          leaving={shownIsAuto && autoSpotlightPhase === "exit"}
         />
       )}
 
