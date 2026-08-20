@@ -91,7 +91,7 @@ export default async function Home() {
           {/* 左侧：如何读这张雷达（含学习阶段） */}
           <aside
             className={`order-2 xl:order-1 ${
-              hasBooks ? "xl:mt-8 xl:flex xl:h-[680px] xl:flex-col" : ""
+              hasBooks ? "xl:mt-[66px] xl:flex xl:h-[612px] xl:flex-col" : ""
             }`}
           >
             <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
