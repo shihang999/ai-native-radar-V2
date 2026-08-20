@@ -419,7 +419,7 @@ export function RecommendDrawer() {
         <DrawerHeader
           title={
             stage === "mode"
-              ? showManualForm ? "手工推荐一本书" : "智能录入一段推荐（推荐）"
+              ? showManualForm ? "手工推荐一本书" : "AI 智能录入"
               : stage === "preview"
                 ? "预览并确认推荐"
                 : "已收到你的推荐"
@@ -427,7 +427,6 @@ export function RecommendDrawer() {
           onClose={handleClose}
           steps={stage}
           showManual={showManualForm}
-          onToggleManual={() => setShowManualForm((s) => !s)}
         />
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -498,38 +497,28 @@ function DrawerHeader(props: {
   onClose: () => void;
   steps: Stage;
   showManual: boolean;
-  onToggleManual: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#E2E8F0] px-6 py-4">
-      <div>
+    <div className="border-b border-[#E2E8F0] px-6 py-4">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold text-[#10213E]">{props.title}</h2>
-        <div className="mt-1 flex items-center gap-2 text-xs text-[#64748B]">
-          <StepDot active={props.steps === "mode" || props.showManual} label="录入方式" />
-          <span className="text-[#CBD5E1]">—</span>
-          <StepDot active={props.steps === "preview"} label="预览确认" />
-          <span className="text-[#CBD5E1]">—</span>
-          <StepDot active={props.steps === "success"} label="提交成功" />
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={props.onToggleManual}
-          className="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs text-[#64748B] transition hover:text-[#5DB2E2]"
-        >
-          {props.showManual ? "↩ 改用智能录入" : "我想手工填写"}
-        </button>
         <button
           type="button"
           onClick={props.onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-lg transition hover:bg-[#F5F5F6]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition hover:bg-[#F5F5F6]"
           aria-label="关闭"
         >
           <svg className="h-5 w-5 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+      <div className="mt-2 flex w-full items-center text-xs text-[#64748B]">
+        <StepDot active={props.steps === "mode" || props.showManual} label="录入" />
+        <span className="mx-2 h-px flex-1 bg-[#CBD5E1]" />
+        <StepDot active={props.steps === "preview"} label="预览" />
+        <span className="mx-2 h-px flex-1 bg-[#CBD5E1]" />
+        <StepDot active={props.steps === "success"} label="推荐成功" />
       </div>
     </div>
   );
@@ -539,7 +528,7 @@ function StepDot(props: { active?: boolean; label: string }) {
   return (
     <span
       className={
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 " +
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 " +
         (props.active ? "bg-[#5DB2E2]/10 text-[#5DB2E2]" : "bg-[#F1F5F9] text-[#94A3B8]")
       }
     >
@@ -985,7 +974,7 @@ function PreviewPanel(props: {
           type="text"
           value={props.recommender}
           onChange={(e) => props.setRecommender(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-[#E2E8F0] px-4 py-2.5 text-sm placeholder-[#9CA3AF] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
+          className="mt-1 w-full rounded-lg border border-[#E2E8F0] px-4 py-2.5 text-sm text-[#10213E] placeholder-[#9CA3AF] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/20"
           placeholder="你的名字或昵称，留名将在审核通过后显示在资源详情页中~"
         />
       </div>

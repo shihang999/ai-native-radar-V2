@@ -14,6 +14,13 @@ interface BooksPageProps {
 
 export default async function BooksPage({ searchParams }: BooksPageProps) {
   const params = await searchParams;
+  const listSearchParams = new URLSearchParams();
+  if (params.domain) listSearchParams.set("domain", params.domain);
+  if (params.ring) listSearchParams.set("ring", params.ring);
+  if (params.type) listSearchParams.set("type", params.type);
+  if (params.q) listSearchParams.set("q", params.q);
+  const listQuery = listSearchParams.toString();
+  const returnTo = listQuery ? `/books?${listQuery}` : "/books";
 
   // 获取筛选后的书单数据
   const filteredResources = await getResourcesWithFilters({
@@ -45,7 +52,7 @@ export default async function BooksPage({ searchParams }: BooksPageProps) {
         {filteredResources.length > 0 ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredResources.map((resource) => (
-              <BookCard key={resource.id} resource={resource} />
+              <BookCard key={resource.id} resource={resource} returnTo={returnTo} />
             ))}
           </div>
         ) : (

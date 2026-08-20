@@ -7,14 +7,18 @@ import { BookCover } from "@/components/books/BookCover";
 
 interface BookCardProps {
   resource: Resource;
+  returnTo?: string;
 }
 
-export function BookCard({ resource }: BookCardProps) {
+export function BookCard({ resource, returnTo }: BookCardProps) {
   const domain = getDomainById(resource.domain_id);
   const rating = resource.rating || 3;
+  const detailHref = returnTo
+    ? { pathname: `/books/${resource.id}`, query: { returnTo } }
+    : `/books/${resource.id}`;
 
   return (
-    <Link href={`/books/${resource.id}`} className="group">
+    <Link href={detailHref} className="group">
       <article className="h-full rounded-xl border border-[#E2E8F0] bg-white p-4 transition-all hover:border-[#CBD5E1] hover:shadow-lg">
         {/* 封面图：DB 封面 > Open Library（按 ISBN）> 本地占位图 */}
         <div className="relative mb-4 aspect-[3/4] w-full overflow-hidden rounded-lg bg-[#F1F5F9]">

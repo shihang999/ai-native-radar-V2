@@ -8,6 +8,14 @@ import { BookCover } from "@/components/books/BookCover";
 
 interface BookDetailPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
+}
+
+function getBookListReturnPath(returnTo?: string): string | null {
+  if (returnTo === "/books" || returnTo?.startsWith("/books?")) {
+    return returnTo;
+  }
+  return null;
 }
 
 export async function generateMetadata({ params }: BookDetailPageProps): Promise<Metadata> {
@@ -26,8 +34,10 @@ export async function generateMetadata({ params }: BookDetailPageProps): Promise
   };
 }
 
-export default async function BookDetailPage({ params }: BookDetailPageProps) {
+export default async function BookDetailPage({ params, searchParams }: BookDetailPageProps) {
   const { id } = await params;
+  const { returnTo } = await searchParams;
+  const bookListReturnPath = getBookListReturnPath(returnTo);
   const resource = await getResourceById(id);
 
   if (!resource) {
@@ -54,7 +64,7 @@ export default async function BookDetailPage({ params }: BookDetailPageProps) {
       <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         {/* 返回按钮 */}
         <Link
-          href="/"
+          href={bookListReturnPath ?? "/"}
           className="inline-flex items-center gap-2 text-sm font-medium text-[#5DB2E2] transition hover:text-[#4A9FD8] mb-6"
         >
           <svg
@@ -70,7 +80,7 @@ export default async function BookDetailPage({ params }: BookDetailPageProps) {
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          返回雷达
+          {bookListReturnPath ? "返回书单" : "返回雷达"}
         </Link>
 
         {/* 主内容区 */}

@@ -315,6 +315,16 @@ export function RadarChart({ books }: RadarChartProps) {
 
   return (
     <>
+      {/* 自动播放状态提示：固定占位，避免自动 spotlight 暂停时雷达上下跳动 */}
+      <div className="pointer-events-none mx-auto mb-4 flex min-h-4 w-full max-w-[680px] items-center justify-center text-[11px] text-[#64748B]">
+        {isSpotlightActive && !hoveredBook && !selectedBook && autoSpotlightBook && (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-[#2563EB]" />
+            正在为你随机发现好书 · 移动鼠标即可手动探索
+          </span>
+        )}
+      </div>
+
       <svg
         ref={svgRef}
         viewBox={`0 0 ${size} ${size}`}
@@ -409,14 +419,6 @@ export function RadarChart({ books }: RadarChartProps) {
           book={selectedBook}
           onClose={() => setSelectedBook(null)}
         />
-      )}
-
-      {/* 自动播放状态提示（仅在系统自动 spotlight 播放中、且无用户 hover 时显示） */}
-      {isSpotlightActive && !hoveredBook && !selectedBook && autoSpotlightBook && (
-        <div className="pointer-events-none mx-auto mt-4 flex w-full max-w-[720px] items-center justify-center gap-2 text-[11px] text-[#64748B]">
-          <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-[#2563EB]" />
-          正在为你随机发现好书 · 移动鼠标即可手动探索
-        </div>
       )}
     </>
   );

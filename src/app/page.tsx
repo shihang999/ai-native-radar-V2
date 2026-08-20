@@ -87,7 +87,7 @@ export default async function Home() {
 
       {/* 雷达主视觉区 - 一屏展示；xl 及以上为两列：左侧解读 + 右侧雷达放大占据剩余空间 */}
       <section className="mb-10 flex min-h-[calc(100svh-64px)] snap-start items-center justify-center">
-        <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-center xl:justify-center">
+        <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-start xl:justify-center">
           {/* 左侧：如何读这张雷达（含学习阶段） */}
           <aside className="order-2 xl:order-1">
             <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
@@ -128,7 +128,7 @@ export default async function Home() {
           </aside>
 
           {/* 雷达：xl 下放大占据剩余空间，SVG 及其交互完整保留 */}
-          <div className="order-1 mx-auto w-full max-w-[720px] xl:order-2 xl:max-w-none">
+          <div className="order-1 mx-auto w-full max-w-[680px] xl:order-2 xl:max-w-[680px]">
             {hasBooks ? (
               <RadarChart books={books} />
             ) : (
