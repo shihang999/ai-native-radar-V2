@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { submitBatchRecommendations } from '@/lib/api/resources';
+import { getResourceById, submitBatchRecommendations } from '@/lib/api/resources';
 import type { BatchRecommendationItem, SubmitBatchResult } from '@/lib/api/resources';
 import type { InputMode, RecommendationRating, Source } from '@/lib/ai/types';
 import {
@@ -41,6 +41,24 @@ function normalizeItem(raw: Record<string, unknown>, idx: number): BatchRecommen
   const author = sanitizeFreeText(raw.author, 60);
   const resource_url = raw.resource_url && typeof raw.resource_url === 'string' && isHttpUrl(raw.resource_url) ? raw.resource_url : null;
   const reason = sanitizeFreeText(raw.reason, 2000) ?? '未提供推荐理由';
+  const linked_resource_id = raw.linked_resource_id == null
+    ? null
+    : sanitizeFreeText(raw.linked_resource_id, 64);
+  if (raw.linked_resource_id != null && !linked_resource_id) {
+    return {
+      title,
+      author,
+      resource_type,
+      resource_url,
+      domain_id,
+      ring_id,
+      rating,
+      reason,
+      linked_resource_id: null,
+      __valid: false,
+      __error: `第 ${idx + 1} 条关联的资源 ID 无效`,
+    } as BatchRecommendationItem & { __valid: boolean; __error?: string };
+  }
   const ai_confidence = raw.ai_confidence && typeof raw.ai_confidence === 'object'
     ? (raw.ai_confidence as BatchRecommendationItem['ai_confidence'])
     : null;
@@ -54,6 +72,7 @@ function normalizeItem(raw: Record<string, unknown>, idx: number): BatchRecommen
     rating,
     reason,
     ai_confidence,
+    linked_resource_id,
     __valid: true,
   } as BatchRecommendationItem & { __valid: boolean; __error?: string };
 }
@@ -130,6 +149,38 @@ export async function POST(req: NextRequest): Promise<NextResponse<SubmitBatchRe
       success_count: 0,
       fail_items: failItems,
       error: '没有可提交的有效条目',
+    });
+  }
+
+  const linkedItems = normalized.filter((item) => item.linked_resource_id);
+  if (linkedItems.length > 0) {
+    const linkedResources = await Promise.all(
+      linkedItems.map((item) => getResourceById(item.linked_resource_id!)),
+    );
+    const missingIndex = linkedResources.findIndex((resource) => !resource);
+    if (missingIndex >= 0) {
+      const missingItem = linkedItems[missingIndex];
+      return NextResponse.json({
+        success: false,
+        success_count: 0,
+        fail_items: [{
+          index: normalized.indexOf(missingItem),
+          error: '关联的正式资源不存在或尚未通过审核',
+          item: missingItem,
+        }],
+        error: '无法提交评价：关联的正式资源不存在或尚未通过审核',
+      }, { status: 400 });
+    }
+    linkedItems.forEach((item, index) => {
+      const resource = linkedResources[index]!;
+      Object.assign(item, {
+        title: resource.title,
+        author: resource.author,
+        resource_type: resource.resource_type,
+        resource_url: resource.resource_url,
+        domain_id: resource.domain_id,
+        ring_id: resource.ring_id,
+      });
     });
   }
 

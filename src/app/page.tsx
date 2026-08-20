@@ -89,11 +89,19 @@ export default async function Home() {
       <section className="mb-10 flex min-h-[calc(100svh-64px)] snap-start items-center justify-center">
         <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-start xl:justify-center">
           {/* 左侧：如何读这张雷达（含学习阶段） */}
-          <aside className="order-2 xl:order-1">
+          <aside
+            className={`order-2 xl:order-1 ${
+              hasBooks ? "xl:mt-8 xl:flex xl:h-[680px] xl:flex-col" : ""
+            }`}
+          >
             <h2 className="mb-3 text-sm font-semibold text-[#10213E]">
               如何读这张雷达
             </h2>
-            <dl className="grid gap-3 text-xs leading-5">
+            <dl
+              className={`grid gap-3 text-xs leading-5 ${
+                hasBooks ? "xl:flex xl:flex-1 xl:flex-col xl:justify-between" : ""
+              }`}
+            >
               <div className="border-l-2 border-[#5DB2E2] pl-3">
                 <dt className="font-semibold text-[#10213E]">颜色 = 知识领域</dt>
                 <dd className="text-[#64748B]">不同颜色代表 AI 学习中的不同认知方向。</dd>

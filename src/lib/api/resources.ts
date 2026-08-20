@@ -25,6 +25,7 @@ export interface BatchRecommendationItem {
   reason: string;
   ai_confidence?: ParsedRecommendationItem['confidence'] | null;
   raw_source_excerpt?: string | null;
+  linked_resource_id?: string | null;
 }
 
 export interface SubmitBatchInput {
@@ -202,6 +203,7 @@ function buildInsertPayload(
     ocr_text_snapshot,
     audio_metadata: audio_metadata_json,
     ai_field_confidence: confidence as UserRecommendationInsert['ai_field_confidence'],
+    linked_resource_id: it.linked_resource_id ?? null,
   };
 }
 

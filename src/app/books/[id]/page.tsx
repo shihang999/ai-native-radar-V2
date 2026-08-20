@@ -5,6 +5,7 @@ import { getResourceById, getRelatedResources, recordView } from "@/lib/api/reso
 import { getDomainById, getRingById } from "@/lib/constants";
 import { RatingSection } from "@/components/books/RatingSection";
 import { BookCover } from "@/components/books/BookCover";
+import { ExistingResourceReviewButton } from "@/components/books/ExistingResourceReviewButton";
 
 interface BookDetailPageProps {
   params: Promise<{ id: string }>;
@@ -206,7 +207,20 @@ export default async function BookDetailPage({ params, searchParams }: BookDetai
 
             {/* 推荐信息 */}
             <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-[#10213E]">推荐信息</h2>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-[#10213E]">推荐信息</h2>
+                <ExistingResourceReviewButton
+                  resource={{
+                    id: resource.id,
+                    title: resource.title,
+                    author: resource.author,
+                    resource_type: resource.resource_type,
+                    resource_url: resource.resource_url,
+                    domain_id: resource.domain_id,
+                    ring_id: resource.ring_id,
+                  }}
+                />
+              </div>
 
               {/* 推荐指数 */}
               <div>

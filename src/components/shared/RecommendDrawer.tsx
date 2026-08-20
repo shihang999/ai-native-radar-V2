@@ -11,6 +11,10 @@ import type {
   ResourceType,
 } from "@/lib/ai/types";
 import { RESOURCE_TYPES } from "@/lib/ai/types";
+import {
+  OPEN_RECOMMEND_DRAWER_EVENT,
+  type OpenRecommendDrawerDetail,
+} from "@/lib/recommendation-drawer";
 
 type Stage = "mode" | "preview" | "success";
 
@@ -27,6 +31,7 @@ interface FormItem {
   confidence?: FieldConfidence | null;
   raw_source_excerpt?: string | null;
   is_new_blank?: boolean;
+  linked_resource_id?: string | null;
 }
 
 const emptyForm = (): FormItem => ({
@@ -91,6 +96,7 @@ export function RecommendDrawer() {
   const [formItems, setFormItems] = useState<FormItem[]>([]);
   const [recommender, setRecommender] = useState("");
   const [friendlyError, setFriendlyError] = useState<string | null>(null);
+  const [reviewingExisting, setReviewingExisting] = useState(false);
 
   // 原手工表单字段兜底
   const [manualForm, setManualForm] = useState<ManualFormValue>({
@@ -106,19 +112,25 @@ export function RecommendDrawer() {
 
   // 监听全局事件 & URL query 打开
   useEffect(() => {
-    const handleOpenDrawer = () => openDrawer();
-    window.addEventListener("openRecommendDrawer", handleOpenDrawer);
+    const handleOpenDrawer = (event: Event) => {
+      const detail = event instanceof CustomEvent
+        ? event.detail as OpenRecommendDrawerDetail | undefined
+        : undefined;
+      openDrawer(detail);
+    };
+    window.addEventListener(OPEN_RECOMMEND_DRAWER_EVENT, handleOpenDrawer);
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("action") === "recommend") {
       openDrawer();
     }
-    return () => window.removeEventListener("openRecommendDrawer", handleOpenDrawer);
+    return () => window.removeEventListener(OPEN_RECOMMEND_DRAWER_EVENT, handleOpenDrawer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function openDrawer() {
+  function openDrawer(detail?: OpenRecommendDrawerDetail) {
+    const existingResource = detail?.intent === "review-existing" ? detail.resource : null;
     setIsOpen(true);
-    setStage("mode");
+    setStage(existingResource ? "preview" : "mode");
     setMode("text");
     setShowManualForm(false);
     setRawText("");
@@ -129,9 +141,23 @@ export function RecommendDrawer() {
     setParsing(false);
     setSubmitting(false);
     setParseOutput(null);
-    setFormItems([]);
+    setFormItems(existingResource ? [{
+      id: cryptoId(),
+      title: existingResource.title,
+      author: existingResource.author,
+      resource_type: existingResource.resource_type,
+      resource_url: existingResource.resource_url,
+      domain_id: existingResource.domain_id,
+      ring_id: RINGS.some((ring) => ring.id === existingResource.ring_id)
+        ? existingResource.ring_id as FormItem["ring_id"]
+        : "beginner",
+      rating: "",
+      reason: "",
+      linked_resource_id: existingResource.id,
+    }] : []);
     setRecommender("");
     setFriendlyError(null);
+    setReviewingExisting(!!existingResource);
     setManualForm({
       title: "",
       resource_type: "book",
@@ -146,6 +172,7 @@ export function RecommendDrawer() {
 
   function handleClose() {
     setIsOpen(false);
+    setReviewingExisting(false);
     stopRecordingIfAny();
   }
 
@@ -256,13 +283,16 @@ export function RecommendDrawer() {
           reason: it.reason!,
           ai_confidence: it.confidence ?? null,
           raw_source_excerpt: it.raw_source_excerpt ?? null,
+          linked_resource_id: it.linked_resource_id ?? null,
         })),
-        input_mode: showManualForm ? "manual" : mode,
-        source: showManualForm ? "manual" : "ai_parsed",
+        input_mode: reviewingExisting || showManualForm ? "manual" : mode,
+        source: reviewingExisting || showManualForm ? "manual" : "ai_parsed",
         recommender_name: recommender.trim() || null,
-        raw_text_snapshot: mode === "text" ? rawText : parseOutput?.raw_extracted_text ?? null,
-        ocr_text_snapshot: parseOutput?.ocr_text_snapshot ?? null,
-        audio_metadata: parseOutput?.audio_metadata ?? null,
+        raw_text_snapshot: reviewingExisting
+          ? null
+          : mode === "text" ? rawText : parseOutput?.raw_extracted_text ?? null,
+        ocr_text_snapshot: reviewingExisting ? null : parseOutput?.ocr_text_snapshot ?? null,
+        audio_metadata: reviewingExisting ? null : parseOutput?.audio_metadata ?? null,
       };
       const res = await fetch("/api/recommendations/submit-batch", {
         method: "POST",
@@ -274,7 +304,12 @@ export function RecommendDrawer() {
         throw new Error(data.error ?? "提交失败");
       }
       setStage("success");
-      showToast(`已提交 ${data.success_count ?? 1} 条推荐，等待审核后将进入雷达`, "success");
+      showToast(
+        reviewingExisting
+          ? "评价提交成功，审核后将补充到这本书的推荐信息"
+          : `已提交 ${data.success_count ?? 1} 条推荐，等待审核后将进入雷达`,
+        "success",
+      );
       setTimeout(() => handleClose(), 2500);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "提交失败，请稍后重试", "error");
@@ -421,8 +456,12 @@ export function RecommendDrawer() {
             stage === "mode"
               ? showManualForm ? "手工推荐一本书" : "AI 智能录入"
               : stage === "preview"
-                ? "预览并确认推荐"
-                : "已收到你的推荐"
+                ? reviewingExisting
+                  ? "评价这本书"
+                  : "预览并确认推荐"
+                : reviewingExisting
+                  ? "已收到你的评价"
+                  : "已收到你的推荐"
           }
           onClose={handleClose}
           steps={stage}
@@ -475,13 +514,19 @@ export function RecommendDrawer() {
               addBlankItem={addBlankItem}
               recommender={recommender}
               setRecommender={setRecommender}
-              onBack={() => setStage("mode")}
+              onBack={reviewingExisting ? handleClose : () => setStage("mode")}
               onSubmit={handleSubmitBatch}
               submitting={submitting}
+              reviewingExisting={reviewingExisting}
             />
           )}
 
-          {stage === "success" && <SuccessPanel hasName={!!recommender.trim()} />}
+          {stage === "success" && (
+            <SuccessPanel
+              hasName={!!recommender.trim()}
+              reviewingExisting={reviewingExisting}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -941,11 +986,20 @@ function PreviewPanel(props: {
   onBack: () => void;
   onSubmit: () => void;
   submitting: boolean;
+  reviewingExisting: boolean;
 }) {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-[#5DB2E2]/30 bg-[#5DB2E2]/5 p-4 text-sm text-[#10213E]">
-        💡 AI 已帮你拆成可提交的书单。<b>所有字段都可以直接改</b>，尤其检查：<span className="text-[#E63946]">标题、领域、学习阶段</span>。修改完再确认提交，将进入人工审核。
+        {props.reviewingExisting ? (
+          <>
+            书籍信息已自动填好。请选择你的推荐指数，并写下至少 5 个字的评价理由；提交后将进入人工审核。
+          </>
+        ) : (
+          <>
+            💡 AI 已帮你拆成可提交的书单。<b>所有字段都可以直接改</b>，尤其检查：<span className="text-[#E63946]">标题、领域、学习阶段</span>。修改完再确认提交，将进入人工审核。
+          </>
+        )}
       </div>
       <div className="space-y-4">
         {props.items.map((it, idx) => (
@@ -956,17 +1010,20 @@ function PreviewPanel(props: {
             update={(patch) => props.updateItem(it.id, patch)}
             onRemove={() => props.removeItem(it.id)}
             canRemove={props.items.length > 1}
+            metadataLocked={props.reviewingExisting}
           />
         ))}
       </div>
-      <button
-        type="button"
-        onClick={props.addBlankItem}
-        disabled={props.items.length >= 10}
-        className="w-full rounded-lg border border-dashed border-[#E2E8F0] bg-white py-3 text-sm text-[#64748B] transition hover:border-[#5DB2E2] hover:text-[#5DB2E2] disabled:opacity-60"
-      >
-        + 新增一本空白条目（最多 10 本）
-      </button>
+      {!props.reviewingExisting && (
+        <button
+          type="button"
+          onClick={props.addBlankItem}
+          disabled={props.items.length >= 10}
+          className="w-full rounded-lg border border-dashed border-[#E2E8F0] bg-white py-3 text-sm text-[#64748B] transition hover:border-[#5DB2E2] hover:text-[#5DB2E2] disabled:opacity-60"
+        >
+          + 新增一本空白条目（最多 10 本）
+        </button>
+      )}
 
       <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
         <label className="mb-1 block text-sm font-medium text-[#10213E]">想留个名字吗？（可选）</label>
@@ -985,7 +1042,7 @@ function PreviewPanel(props: {
           onClick={props.onBack}
           className="flex-1 rounded-lg border border-[#E2E8F0] px-4 py-2.5 text-sm font-medium text-[#64748B] transition hover:bg-[#F5F5F6]"
         >
-          ← 返回重新粘贴
+          {props.reviewingExisting ? "取消评价" : "← 返回重新粘贴"}
         </button>
         <button
           type="button"
@@ -993,7 +1050,11 @@ function PreviewPanel(props: {
           disabled={props.submitting}
           className="flex-1 rounded-lg bg-[#5DB2E2] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4A9FD8] disabled:opacity-60"
         >
-          {props.submitting ? "提交中…" : "确认提交（进入人工审核）"}
+          {props.submitting
+            ? "提交中…"
+            : props.reviewingExisting
+              ? "提交评价（进入人工审核）"
+              : "确认提交（进入人工审核）"}
         </button>
       </div>
     </div>
@@ -1006,6 +1067,7 @@ function PreviewCard(props: {
   update: (patch: Partial<FormItem>) => void;
   onRemove: () => void;
   canRemove: boolean;
+  metadataLocked: boolean;
 }) {
   const it = props.item;
   const low = (n?: number | null) => typeof n === "number" && n < 0.65;
@@ -1013,17 +1075,19 @@ function PreviewCard(props: {
     <div className="rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] antialiased [text-rendering:optimizeLegibility]">
       <div className="mb-3 flex items-center justify-between">
         <div className="inline-flex items-center gap-2 rounded-full bg-[#5DB2E2]/10 px-2.5 py-1 text-xs font-semibold text-[#0369A1]">
-          第 {props.index + 1} 本
+          {props.metadataLocked ? "当前资源" : `第 ${props.index + 1} 本`}
           {it.is_new_blank && <span className="text-[#64748B]">（空白）</span>}
         </div>
-        <button
-          type="button"
-          onClick={props.onRemove}
-          disabled={!props.canRemove}
-          className="text-xs font-medium text-[#64748B] transition hover:text-[#EF4444] disabled:opacity-40"
-        >
-          删除这本
-        </button>
+        {!props.metadataLocked && (
+          <button
+            type="button"
+            onClick={props.onRemove}
+            disabled={!props.canRemove}
+            className="text-xs font-medium text-[#64748B] transition hover:text-[#EF4444] disabled:opacity-40"
+          >
+            删除这本
+          </button>
+        )}
       </div>
       {it.is_new_blank && (
         <div className="mb-4 rounded-lg border border-dashed border-[#5DB2E2]/50 bg-[#5DB2E2]/5 px-3 py-2 text-[13px] leading-5 font-medium text-[#0369A1]">
@@ -1036,7 +1100,8 @@ function PreviewCard(props: {
             type="text"
             value={it.title}
             onChange={(e) => props.update({ title: e.target.value })}
-            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+            disabled={props.metadataLocked}
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
             placeholder="书名或课程/文章名称"
           />
         </FieldWithWarn>
@@ -1046,7 +1111,8 @@ function PreviewCard(props: {
               type="text"
               value={it.author ?? ""}
               onChange={(e) => props.update({ author: e.target.value || null })}
-              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+              disabled={props.metadataLocked}
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
               placeholder="未识别可留空"
             />
           </FieldWithWarn>
@@ -1054,7 +1120,8 @@ function PreviewCard(props: {
             <select
               value={it.resource_type}
               onChange={(e) => props.update({ resource_type: e.target.value as ResourceType })}
-              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+              disabled={props.metadataLocked}
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
             >
               {RESOURCE_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -1069,7 +1136,8 @@ function PreviewCard(props: {
             type="url"
             value={it.resource_url ?? ""}
             onChange={(e) => props.update({ resource_url: e.target.value || null })}
-            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+            disabled={props.metadataLocked}
+            className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
             placeholder="https://...（可留空）"
           />
         </FieldWithWarn>
@@ -1078,7 +1146,8 @@ function PreviewCard(props: {
             <select
               value={it.domain_id}
               onChange={(e) => props.update({ domain_id: e.target.value })}
-              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+              disabled={props.metadataLocked}
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
             >
               <option value="">请选择领域</option>
               {DOMAINS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1088,13 +1157,14 @@ function PreviewCard(props: {
             <select
               value={it.ring_id}
               onChange={(e) => props.update({ ring_id: e.target.value as FormItem["ring_id"] })}
-              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
+              disabled={props.metadataLocked}
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25 disabled:cursor-not-allowed disabled:bg-[#F8FAFC] disabled:text-[#64748B]"
             >
               {RINGS.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </FieldWithWarn>
         </div>
-        <FieldWithWarn label="推荐指数" required warn={low(it.confidence?.rating)}>
+        <FieldWithWarn label={props.metadataLocked ? "我的推荐指数" : "推荐指数"} required warn={low(it.confidence?.rating)}>
           <div className="flex gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
@@ -1117,13 +1187,13 @@ function PreviewCard(props: {
             ))}
           </div>
         </FieldWithWarn>
-        <FieldWithWarn label="推荐理由" required>
+        <FieldWithWarn label={props.metadataLocked ? "我的评价理由" : "推荐理由"} required>
           <textarea
             rows={3}
             value={it.reason}
             onChange={(e) => props.update({ reason: e.target.value })}
             className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-[15px] leading-6 text-[#0F172A] placeholder-[#94A3B8] focus:border-[#5DB2E2] focus:outline-none focus:ring-2 focus:ring-[#5DB2E2]/25"
-            placeholder="保留了你原文的推荐理由，可直接编辑；至少 5 个字"
+            placeholder={props.metadataLocked ? "写下你对这本书的评价，至少 5 个字" : "保留了你原文的推荐理由，可直接编辑；至少 5 个字"}
           />
         </FieldWithWarn>
         {it.raw_source_excerpt && (
@@ -1152,16 +1222,24 @@ function FieldWithWarn(props: { label: string; required?: boolean; warn?: boolea
   );
 }
 
-function SuccessPanel(props: { hasName: boolean }) {
+function SuccessPanel(props: { hasName: boolean; reviewingExisting: boolean }) {
   return (
     <div className="rounded-xl border border-[#00524C] bg-[#00524C]/5 p-5 text-sm text-[#00524C]">
       <div className="mb-3 flex items-start gap-3">
         <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#00524C] text-white">✓</div>
         <div>
-          <div className="font-semibold text-[#00524C]">已收到你的推荐，感谢共建！</div>
+          <div className="font-semibold text-[#00524C]">
+            {props.reviewingExisting ? "已收到你的评价，感谢分享！" : "已收到你的推荐，感谢共建！"}
+          </div>
           <div className="mt-1 text-xs text-[#00524C]/80">
-            你的推荐已进入审核队列，审核通过后将正式进入雷达。
-            {props.hasName && <span className="block">留名将在审核通过后，显示在资源详情页的「推荐人」位置。</span>}
+            {props.reviewingExisting
+              ? "你的评价已进入审核队列，审核通过后将补充到这本书的推荐信息中。"
+              : "你的推荐已进入审核队列，审核通过后将正式进入雷达。"}
+            {props.hasName && (
+              <span className="block">
+                留名将在审核通过后，显示在资源详情页的「推荐人」位置。
+              </span>
+            )}
           </div>
         </div>
       </div>

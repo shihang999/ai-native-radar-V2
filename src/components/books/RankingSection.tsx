@@ -45,7 +45,7 @@ export async function RankingSection() {
   ]);
 
   return (
-    <section className="mb-12 snap-start">
+    <section className="mb-12 snap-start border-t border-[#E2E8F0] pt-10">
       <h2 className="mb-6 text-xl font-semibold text-[#10213E]">榜单推荐</h2>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <RankingCard
