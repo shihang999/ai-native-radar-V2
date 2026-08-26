@@ -20,12 +20,14 @@ export function BookCard({ resource, returnTo }: BookCardProps) {
   return (
     <Link href={detailHref} className="group">
       <article className="h-full rounded-xl border border-[#E2E8F0] bg-white p-4 transition-all hover:border-[#CBD5E1] hover:shadow-lg">
-        {/* 封面图：DB 封面 > Open Library（按 ISBN）> 本地占位图 */}
+        {/* 封面图：DB 封面 > Open Library（按 ISBN）> 书名模版封面 */}
         <div className="relative mb-4 aspect-[3/4] w-full overflow-hidden rounded-lg bg-[#F1F5F9]">
           <BookCover
             coverImageUrl={resource.cover_image_url}
             isbn={resource.isbn}
             title={resource.title}
+            author={resource.author}
+            domainId={resource.domain_id}
             className="object-cover"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />

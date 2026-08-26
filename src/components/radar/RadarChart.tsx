@@ -15,6 +15,8 @@ const { size, centerX, centerY, maxRadius } = RADAR_CONFIG;
 
 interface RadarChartProps {
   books: Book[];
+  /** 版本高亮：命中的书籍点位渲染额外强调环（当前所选版本相对上一版的新增点位） */
+  highlightBookIds?: string[];
 }
 
 type HighlightState =
@@ -148,7 +150,7 @@ function computeBookBlipPosition(
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-export function RadarChart({ books }: RadarChartProps) {
+export function RadarChart({ books, highlightBookIds }: RadarChartProps) {
   const [hoveredBook, setHoveredBook] = useState<Book | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -156,6 +158,11 @@ export function RadarChart({ books }: RadarChartProps) {
   /** 鼠标是否在雷达圆形区域内（进入即暂停自动 spotlight） */
   const [pointerInside, setPointerInside] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const highlightSet = useMemo(
+    () => new Set(highlightBookIds ?? []),
+    [highlightBookIds],
+  );
 
   const displayBooks = useMemo(() => {
     const byDomain = new Map<string, Book[]>();
@@ -396,6 +403,7 @@ export function RadarChart({ books }: RadarChartProps) {
               isActive={isSelf}
               onHover={setHoveredBook}
               onClick={setSelectedBook}
+              versionHighlight={highlightSet.has(book.id)}
             />
           );
         })}

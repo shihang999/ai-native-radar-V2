@@ -66,15 +66,20 @@ export async function getResources(): Promise<Resource[]> {
   return data || [];
 }
 
+/**
+ * 本周上新：列出当前进入雷达的书（雷达口径 = 已审核 + 推荐指数 4 星及以上），按上架时间倒序取最新
+ * 统一口径：status='approved' + limit 10 + 主排序(published_at desc) + 稳定次级排序(weighted_score desc, id)
+ * 说明：按“列出几本目前雷达中的书”的口径实现，确保与首页雷达一致、不会因严格 7 天窗口而为空
+ */
 export async function getNewThisWeek(): Promise<Resource[]> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
   const { data, error } = await supabase
     .from('resources')
     .select('*')
     .eq('status', 'approved')
-    .gte('published_at', sevenDaysAgo)
+    .gte('rating', 4)
     .order('published_at', { ascending: false })
+    .order('weighted_score', { ascending: false })
+    .order('id', { ascending: true })
     .limit(10);
 
   if (error) {
@@ -85,47 +90,73 @@ export async function getNewThisWeek(): Promise<Resource[]> {
   return data || [];
 }
 
-export async function getHotThisMonth(): Promise<Resource[]> {
-  const { data, error } = await supabase
-    .from('resources')
-    .select(`
-      *,
-      resource_stats!inner(view_count_30d)
-    `)
-    .eq('status', 'approved')
-    .order('view_count', { ascending: false })
-    .limit(10);
+/**
+ * 本周热门：按“同一本书的推荐次数”排序（最近 7 天内被推荐的次数）
+ * 计算逻辑：统计最近 7 天 user_recommendations 中各标题出现次数，映射到已审核资源
+ * 统一口径：status='approved' + limit 10 + 主排序(推荐次数 desc) + 稳定次级排序(weighted_score desc, published_at desc, id)
+ * 说明：若最近 7 天无推荐（次数均为 0），则退化为按 weighted_score 排序，保证稳定不乱序
+ */
+export async function getTrendingThisWeek(): Promise<Resource[]> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  if (error) {
-    console.error('获取本月最火失败:', error);
+  const [recResult, resResult] = await Promise.all([
+    supabase
+      .from('user_recommendations')
+      .select('title')
+      .gte('created_at', sevenDaysAgo),
+    supabase
+      .from('resources')
+      .select('*')
+      .eq('status', 'approved'),
+  ]);
+
+  if (resResult.error) {
+    console.error('获取本周热门失败:', resResult.error);
     return [];
   }
-
-  return data || [];
-}
-
-export async function getMostViewed(): Promise<Resource[]> {
-  const { data, error } = await supabase
-    .from('resources')
-    .select('*')
-    .eq('status', 'approved')
-    .order('view_count', { ascending: false })
-    .limit(10);
-
-  if (error) {
-    console.error('获取观看最多失败:', error);
-    return [];
+  if (recResult.error) {
+    console.error('统计本周推荐次数失败:', recResult.error);
   }
 
-  return data || [];
+  // 按标题聚合最近 7 天的推荐次数
+  const countByTitle = new Map<string, number>();
+  for (const rec of recResult.data ?? []) {
+    const key = rec.title?.trim();
+    if (!key) continue;
+    countByTitle.set(key, (countByTitle.get(key) ?? 0) + 1);
+  }
+
+  const resources = resResult.data ?? [];
+  return [...resources]
+    .map((resource) => ({
+      resource,
+      recCount: countByTitle.get(resource.title.trim()) ?? 0,
+    }))
+    .sort((a, b) => {
+      if (b.recCount !== a.recCount) return b.recCount - a.recCount;
+      if (b.resource.weighted_score !== a.resource.weighted_score) {
+        return b.resource.weighted_score - a.resource.weighted_score;
+      }
+      const publishedDiff =
+        new Date(b.resource.published_at).getTime() - new Date(a.resource.published_at).getTime();
+      if (publishedDiff !== 0) return publishedDiff;
+      return a.resource.id.localeCompare(b.resource.id);
+    })
+    .slice(0, 10)
+    .map((item) => item.resource);
 }
 
+/**
+ * Inspire Top 10（总榜）：按总评分（贝叶斯加权分 weighted_score）排序，每月更新
+ * 统一口径：status='approved' + limit 10 + 主排序(weighted_score) + 稳定次级排序(published_at)
+ */
 export async function getTopRated(): Promise<Resource[]> {
   const { data, error } = await supabase
     .from('resources')
     .select('*')
     .eq('status', 'approved')
     .order('weighted_score', { ascending: false })
+    .order('published_at', { ascending: false })
     .limit(10);
 
   if (error) {

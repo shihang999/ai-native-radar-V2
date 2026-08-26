@@ -32,6 +32,8 @@ interface BlipProps {
     | "inactive-domain";
   onHover?: (book: Book | null) => void;
   onClick?: (book: Book) => void;
+  /** 版本高亮：该点为当前所选版本相对上一版的新增点位，渲染额外强调环 */
+  versionHighlight?: boolean;
 }
 
 function degToRad(deg: number): number {
@@ -159,6 +161,7 @@ export function Blip({
   highlightState = "none",
   onHover,
   onClick,
+  versionHighlight = false,
 }: BlipProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -240,6 +243,27 @@ export function Blip({
         transition: `opacity ${transitionMs}ms ${easing}`,
       }}
     >
+      {/* 版本新增点强调环：双环 + 呼吸动画，标示当前所选版本相对上一版的新增点位 */}
+      {versionHighlight && (
+        <circle
+          cx={x}
+          cy={y}
+          r={baseRingRadius + 6}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeDasharray="4 3"
+          style={{ pointerEvents: "none" }}
+        >
+          <animate
+            attributeName="opacity"
+            values="0.9;0.35;0.9"
+            dur="1.8s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      )}
+
       {/* 外圆环（行星环效果） - active 阶段淡出 */}
       <circle
         cx={x}

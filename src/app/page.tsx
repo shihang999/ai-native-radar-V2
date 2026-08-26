@@ -1,4 +1,4 @@
-import { RadarChart } from "@/components/radar/RadarChart";
+import { RadarWithTimeline } from "@/components/radar/RadarWithTimeline";
 import { RankingSection } from "@/components/books/RankingSection";
 import { DOMAINS, RINGS } from "@/lib/constants";
 import { getResources } from "@/lib/api/resources";
@@ -85,9 +85,9 @@ export default async function Home() {
         </p>
       </section>
 
-      {/* 雷达主视觉区 - 一屏展示；xl 及以上为两列：左侧解读 + 右侧雷达放大占据剩余空间 */}
+      {/* 雷达主视觉区 - 一屏展示；xl 及以上为三列：左侧解读 + 中间雷达居中 + 右侧版本时间线 */}
       <section className="mb-10 flex min-h-[calc(100svh-64px)] snap-start items-center justify-center">
-        <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-start xl:justify-center">
+        <div className="grid w-full gap-8 xl:grid-cols-[240px_minmax(0,1fr)_240px] xl:items-start">
           {/* 左侧：如何读这张雷达（含学习阶段） */}
           <aside
             className={`order-2 xl:order-1 ${
@@ -135,21 +135,19 @@ export default async function Home() {
             </dl>
           </aside>
 
-          {/* 雷达：xl 下放大占据剩余空间，SVG 及其交互完整保留 */}
-          <div className="order-1 mx-auto w-full max-w-[680px] xl:order-2 xl:max-w-[680px]">
-            {hasBooks ? (
-              <RadarChart books={books} />
-            ) : (
-              <div className="w-full rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-8 py-14 text-center">
-                <p className="text-base font-semibold text-[#10213E]">
-                  当前暂无可展示的雷达点位
-                </p>
-                <p className="mt-3 text-sm leading-7 text-[#64748B]">
-                  只有已审核且推荐指数 4 星及以上的资源会进入首页雷达。你可以先查看书单，或通过“推荐一本书”补充资源。
-                </p>
-              </div>
-            )}
-          </div>
+          {/* 雷达（居中）+ 版本时间线（右侧）；无点位时展示空状态 */}
+          {hasBooks ? (
+            <RadarWithTimeline books={books} />
+          ) : (
+            <div className="order-1 mx-auto w-full max-w-[680px] rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] px-8 py-14 text-center xl:order-2">
+              <p className="text-base font-semibold text-[#10213E]">
+                当前暂无可展示的雷达点位
+              </p>
+              <p className="mt-3 text-sm leading-7 text-[#64748B]">
+                只有已审核且推荐指数 4 星及以上的资源会进入首页雷达。你可以先查看书单，或通过“推荐一本书”补充资源。
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

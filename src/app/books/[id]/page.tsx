@@ -87,12 +87,14 @@ export default async function BookDetailPage({ params, searchParams }: BookDetai
         <div className="grid gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
           {/* 左侧：封面和基础信息 */}
           <div className="space-y-6">
-            {/* 封面大图：DB 封面 > Open Library（按 ISBN）> 本地占位图 */}
+            {/* 封面大图：DB 封面 > Open Library（按 ISBN）> 书名模版封面 */}
             <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-white shadow-lg">
               <BookCover
                 coverImageUrl={resource.cover_image_url}
                 isbn={resource.isbn}
                 title={resource.title}
+                author={resource.author}
+                domainId={resource.domain_id}
                 size="L"
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 380px"

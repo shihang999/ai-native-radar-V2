@@ -1,10 +1,10 @@
 import { RankingCard } from "@/components/books/RankingCard";
 import {
   getNewThisWeek,
-  getHotThisMonth,
-  getMostViewed,
+  getTrendingThisWeek,
   getTopRated,
 } from "@/lib/api/resources";
+import { RANKING_HISTORY } from "@/lib/mock/ranking-history";
 
 // 榜单图标
 const NewIcon = () => (
@@ -13,17 +13,9 @@ const NewIcon = () => (
   </svg>
 );
 
-const HotIcon = () => (
+const TrendingIcon = () => (
   <svg className="h-4 w-4 text-[#EC4899]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.997 7.997 0 0120 14a7.997 7.997 0 01-2.343 5.657z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-  </svg>
-);
-
-const ViewIcon = () => (
-  <svg className="h-4 w-4 text-[#7C3AED]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
   </svg>
 );
 
@@ -34,45 +26,53 @@ const InspireIcon = () => (
 );
 
 /**
- * 榜单推荐模块：本周上新 / 本月最火 / 观看最多 / Inspire Top 10
+ * 榜单推荐模块：本周上新 / 本周热门 / Inspire Top 10（总榜，放最后）
+ * 每个榜单右上角提供「历史榜单」入口，可查看过去各期快照。
  */
 export async function RankingSection() {
-  const [newThisWeek, hotThisMonth, mostViewed, topRated] = await Promise.all([
+  const [newThisWeek, trendingThisWeek, topRated] = await Promise.all([
     getNewThisWeek(),
-    getHotThisMonth(),
-    getMostViewed(),
+    getTrendingThisWeek(),
     getTopRated(),
   ]);
 
   return (
     <section className="mb-12 snap-start border-t border-[#E2E8F0] pt-10">
       <h2 className="mb-6 text-xl font-semibold text-[#10213E]">榜单推荐</h2>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <RankingCard
           title="本周上新"
           icon={<NewIcon />}
           color="#5DB2E2"
           resources={newThisWeek}
+          history={RANKING_HISTORY["new-this-week"]}
           emptyText="暂无新资源"
         />
         <RankingCard
-          title="本月最火"
-          icon={<HotIcon />}
+          title="本周热门"
+          icon={<TrendingIcon />}
           color="#EC4899"
-          resources={hotThisMonth}
-        />
-        <RankingCard
-          title="观看最多"
-          icon={<ViewIcon />}
-          color="#7C3AED"
-          resources={mostViewed}
+          resources={trendingThisWeek}
+          history={RANKING_HISTORY["trending-this-week"]}
+          emptyText="暂无热门推荐"
         />
         <RankingCard
           title="Inspire Top 10"
           icon={<InspireIcon />}
           color="#F59E0B"
           resources={topRated}
+          history={RANKING_HISTORY["top-rated"]}
         />
+      </div>
+
+      {/* 品牌区：雷达产品图标 + 名称，下方保留一段留白 */}
+      <div className="mt-8 flex flex-col items-center gap-2 border-t border-[#F1F5F9] pt-6 pb-16">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#10213E]">
+            <span className="text-sm font-bold text-white">AI</span>
+          </div>
+          <span className="text-base font-semibold text-[#10213E]">AI-Native 读书雷达</span>
+        </div>
       </div>
     </section>
   );
