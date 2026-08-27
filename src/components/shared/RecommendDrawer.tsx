@@ -466,6 +466,7 @@ export function RecommendDrawer() {
           onClose={handleClose}
           steps={stage}
           showManual={showManualForm}
+          reviewingExisting={reviewingExisting}
         />
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -542,6 +543,7 @@ function DrawerHeader(props: {
   onClose: () => void;
   steps: Stage;
   showManual: boolean;
+  reviewingExisting: boolean;
 }) {
   return (
     <div className="border-b border-[#E2E8F0] px-6 py-4">
@@ -563,7 +565,7 @@ function DrawerHeader(props: {
         <span className="mx-2 h-px flex-1 bg-[#CBD5E1]" />
         <StepDot active={props.steps === "preview"} label="预览" />
         <span className="mx-2 h-px flex-1 bg-[#CBD5E1]" />
-        <StepDot active={props.steps === "success"} label="推荐成功" />
+        <StepDot active={props.steps === "success"} label={props.reviewingExisting ? "评价成功" : "推荐成功"} />
       </div>
     </div>
   );

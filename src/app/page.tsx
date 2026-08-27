@@ -28,6 +28,8 @@ function convertResourceToBook(resource: Resource, ringId: Book["ringId"]): Book
     reason: resource.reason,
     coverImageUrl: resource.cover_image_url,
     resourceUrl: resource.resource_url,
+    recommender: resource.recommender,
+    resourceType: resource.resource_type,
   };
 }
 

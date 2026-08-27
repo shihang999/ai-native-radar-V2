@@ -9,6 +9,8 @@ export interface Book {
   reason: string;
   coverImageUrl?: string | null;
   resourceUrl?: string | null;
+  recommender?: string | null;
+  resourceType?: "book" | "course" | "article";
 }
 
 /** 推荐指数类型 */

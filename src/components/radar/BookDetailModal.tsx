@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { type Book, getDomainById, getRingById } from "@/lib/constants";
+import { ExistingResourceReviewButton } from "@/components/books/ExistingResourceReviewButton";
 
 interface BookDetailModalProps {
   book: Book;
@@ -96,24 +97,37 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
           {/* 作者 */}
           <p className="text-sm text-[#9CA3AF] mb-4">{book.author}</p>
 
-          {/* 推荐指数 */}
-          <div className="flex items-center gap-3 mb-6">
-            <span className="text-xs text-[#9CA3AF]">推荐指数</span>
-            <div className="flex items-center gap-0.5">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`text-lg ${
-                    i < book.rating ? "text-[#E63946]" : "text-[#E5E7EB]/20"
-                  }`}
-                >
-                  ★
-                </span>
-              ))}
+          {/* 推荐指数 + 我要评价入口 */}
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-[#9CA3AF]">推荐指数</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`text-lg ${
+                      i < book.rating ? "text-[#E63946]" : "text-[#E5E7EB]/20"
+                    }`}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+              <span className="text-sm font-semibold text-[#F7F7F8]">
+                {book.rating}/5
+              </span>
             </div>
-            <span className="text-sm font-semibold text-[#F7F7F8]">
-              {book.rating}/5
-            </span>
+            <ExistingResourceReviewButton
+              resource={{
+                id: book.id,
+                title: book.title,
+                author: book.author,
+                resource_type: book.resourceType ?? "book",
+                resource_url: book.resourceUrl ?? null,
+                domain_id: book.domainId,
+                ring_id: book.ringId,
+              }}
+            />
           </div>
 
           {/* 推荐理由 */}
@@ -123,6 +137,14 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
             </h3>
             <p className="text-sm leading-6 text-[#D1D5DB]">{book.reason}</p>
           </div>
+
+          {/* 推荐人 */}
+          {book.recommender && (
+            <div className="mt-4 border-t border-[#E5E7EB]/10 pt-4">
+              <h3 className="text-sm font-semibold text-[#F7F7F8] mb-2">推荐人</h3>
+              <p className="text-sm leading-6 text-[#D1D5DB]">{book.recommender}</p>
+            </div>
+          )}
 
           {/* 资料链接 */}
           <div className="mt-4 border-t border-[#E5E7EB]/10 pt-4">
